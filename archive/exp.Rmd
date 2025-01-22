@@ -1,0 +1,98 @@
+
+```{r}
+library(tidyverse)
+library(here)
+library(metafor)
+library(viridis)
+
+d <- readxl::read_xlsx(here("kunin_dataset.xlsx"))
+available_d <- read_csv(here("stimuli_availability.csv"))
+voe_es_d <- read_csv(here("voe_es.csv"))
+
+
+pn_age <- readRDS("pn_age.RDS")
+voe_age <- readRDS("voe_age.RDS")
+ma_long <- readRDS("ma_long_data.RDS")
+```
+
+
+
+
+```{r}
+available_ids <- available_d %>% 
+  filter(grepl("stimuli available:", stmuli_available)) %>% 
+  distinct(study_ID) %>% pull(study_ID)
+```
+
+
+
+```{r}
+voe_age %>% 
+  filter(study_ID %in% available_ids) %>% 
+  ggplot(aes(mean_age_1, yi)) +
+  geom_point(aes(size = n_1, colour = mean_age_1)) +
+  scale_color_viridis() +
+  scale_size(range = c(1, 3)) + 
+  geom_smooth(method = "lm") +
+  geom_errorbar(width = .1, alpha = 1, aes(ymin = yi - vi, ymax = yi + vi)) + #error bars are sampling variances here
+  ggtitle("VOE") +
+  ylab("SMD") +
+  xlab("Mean age") +
+  coord_cartesian(ylim = c(-2,2)) +
+  theme(plot.title = element_text(hjust = 0.5, size = 22), axis.title = element_text(size = 16), axis.text = element_text(size = 12))
+  
+```
+
+# LT model original 
+
+
+```{r}
+results_exposure_phase_add <- rma.mv(x, variance, mods = ~trial_type + exposure_phase + equal_per_nov + age_z + domain + stim_loop, random = ~1|paper_expt_info, data = ma_long)
+results_exposure_phase_add
+
+#Interaction model
+results_exposure_phase_inter <- rma.mv(x, variance, mods = ~trial_type * exposure_phase + equal_per_nov + age_z + domain + stim_loop, random = ~1|paper_expt_info, data = ma_long)
+results_exposure_phase_inter
+
+#Does the interaction model better explain the data
+anova_test_exposure_phase <- anova(results_exposure_phase_inter, results_exposure_phase_add, refit = TRUE)
+anova_test_exposure_phase
+```
+
+LT model after: 
+
+```{r}
+results_exposure_phase_add <- rma.mv(x, variance, mods = ~trial_type + exposure_phase + equal_per_nov + age_z + domain + stim_loop, random = ~1|paper_expt_info, data = ma_long %>%  filter(study_ID %in% available_ids))
+results_exposure_phase_add
+
+#Interaction model
+results_exposure_phase_inter <- rma.mv(x, variance, mods = ~trial_type * exposure_phase + equal_per_nov + age_z + domain + stim_loop, random = ~1|paper_expt_info, data = ma_long %>%  filter(study_ID %in% available_ids))
+results_exposure_phase_inter
+
+#Does the interaction model better explain the data
+anova_test_exposure_phase <- anova(results_exposure_phase_inter, results_exposure_phase_add, refit = TRUE)
+anova_test_exposure_phase
+
+
+ggplot(data = ma_long %>%  filter(study_ID %in% available_ids), 
+       aes(x = mean_age_1, y = x)) +
+  xlab("Mean Infant Age (days)")+
+  ylab("Looking Time") + 
+  geom_point(aes(size = n_1, colour = mean_age_1), alpha = .3) +
+  facet_wrap(~factor(trial_type, level=c('last_train', 'expected', 'unexpected'))) +
+  geom_errorbar(data = ma_long, width = .1, alpha = 0.1, inherit.aes = FALSE, aes(x = mean_age_1, ymin = x - SD/sqrt(n_1)*1.96, ymax = x + SD/sqrt(n_1)*1.96))+
+  scale_color_viridis() +
+  geom_smooth(method = "lm") +
+  theme(plot.title = element_text(hjust = 0.5, size = 22), axis.title = element_text(size = 18), axis.text = element_text(size = 16), strip.text = element_text(size = 16), legend.text = element_text(size = 15), legend.title = element_text(size = 16))
+
+
+```
+
+
+```{r}
+d %>% 
+  distinct(study_ID, long_cite) %>% 
+  mutate(data_available = "") %>% 
+  write_csv("data_availability.csv")
+```
+

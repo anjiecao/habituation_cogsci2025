@@ -1,0 +1,509 @@
+---
+title: "Habituation re-analysis"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: false
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = TRUE,   # Hide warnings
+  message = FALSE    # Hide messages
+)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(lme4)
+library(nlme)
+
+# load real data
+adult_hab_no_last <- read_csv(here("data/raw/adult_hab_no_last.csv"))
+preschooler_hab_no_last <- read_csv(here("data/raw/preschooler_hab_full.csv"))
+infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv"))
+```
+
+# TLDR:
+
+| **Age Group**    | **Single-Subject (NLS)**                                   | **NLME**<br>*`pdDiag(a + b ~ 1)`* | **NLME**<br>*`pdSymm(a + b ~ 1)`* |
+|:----------------:|:---------------------------------------------------------:|:--------------------------------:|:---------------------------------:|
+| **Adults**       | Negative correlation<br>(\(\hat{a}_i\) vs. \(\hat{b}_i\)) | Positive correlation             | Fails to converge                 |
+| **Preschoolers** | Negative correlation<br>(\(\hat{a}_i\) vs. \(\hat{b}_i\)) | Positive correlation             | Fails to converge                 |
+| **Infants**      | Negative correlation<br>(\(\hat{a}_i\) vs. \(\hat{b}_i\)) | No correlation                   | Negative correlation              |
+
+
+# 0. Set up Model Demo
+
+```{r}
+fit_nlme <- function(data, start_vals){
+  fit_nlme <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data   = data,
+  fixed  = a + b ~ 1,
+  random = list(subject = pdDiag(a + b ~ 1)),  # random effect only on b
+  start  = start_vals,
+  control = nlmeControl(
+    pnlsMaxIter = 50,
+    msMaxIter   = 200,
+    tolerance   = 1e-6,
+    opt         = "nlminb"
+  )
+)
+} 
+
+fit_nlme_pdSymm <- function(data, start_vals){
+  fit_nlme <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data   = data,
+  fixed  = a + b ~ 1,
+  random = list(subject = pdSymm(a + b ~ 1)),  # random effect only on b
+  start  = start_vals,
+  control = nlmeControl(
+    pnlsMaxIter = 50,
+    msMaxIter   = 200,
+    tolerance   = 1e-6,
+    opt         = "nlminb"
+  )
+)
+} 
+
+fit_nlme_b_only <- function(data, start_vals){
+  fit_nlme <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data   = data,
+  fixed  = a + b ~ 1,
+  random = b ~ 1 | subject,  # random effect only on b
+  start  = start_vals,
+  control = nlmeControl(
+    pnlsMaxIter = 50,
+    msMaxIter   = 200,
+    tolerance   = 1e-6,
+    opt         = "nlminb"
+  )
+)
+} 
+
+fit_nlme_a_only <- function(data, start_vals){
+  fit_nlme <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data   = data,
+  fixed  = a + b ~ 1,
+  random = a ~ 1 | subject,  # random effect only on b
+  start  = start_vals,
+  control = nlmeControl(
+    pnlsMaxIter = 50,
+    msMaxIter   = 200,
+    tolerance   = 1e-6,
+    opt         = "nlminb"
+  )
+)
+} 
+```
+
+
+# 1. Generate Fake Dataset where we know a and b
+
+## 1.1 Generate the data 
+
+
+```{r}
+n_subjects  <- 50
+n_trials    <- 20
+a_range     <- c(5000, 7000)  # narrower range for 'a'
+b_range     <- c(-0.08, -0.03) # narrower range for 'b' (decay rate)
+residual_sd <- 150             # moderate residual noise
+
+sim_data <- lapply(seq_len(n_subjects), function(i) {
+  # Draw subject-specific true parameters:
+  a_i <- runif(1, a_range[1], a_range[2])
+  b_i <- runif(1, b_range[1], b_range[2])
+
+  # Generate times
+  trial_number <- seq_len(n_trials)
+
+  # True expected looking time
+  true_looking <- a_i * exp(b_i * trial_number)
+
+  # Add some random noise
+  observed_looking <- true_looking + rnorm(n_trials, mean = 0, sd = residual_sd)
+
+  # Enforce a minimum > 0 (sometimes large negative residual can produce small or negative values)
+  observed_looking <- pmax(observed_looking, 10)
+
+  # Return a data frame for this subject
+  data.frame(
+    subject      = factor(i),
+    trial_number = trial_number,
+    trial_looking_time = observed_looking,
+    true_a       = a_i,
+    true_b       = b_i
+  )
+}) %>%
+  bind_rows()
+```
+
+## 1.2 Show real a and b independence 
+
+```{r}
+sim_data %>% 
+  distinct(true_a, true_b) %>% 
+  ggplot(aes(x = true_a, y = true_b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+
+## 1.3 Show model demonstration 
+
+```{r}
+start_vals <- c(a = mean(a_range), b = mean(b_range))
+sim_model <- fit_nlme(sim_data, start_vals)
+
+fixed_effects <- fixef(sim_model)
+
+fitted_random_effects <- ranef(sim_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+
+
+comparison <- left_join(fitted_random_effects, 
+                        sim_data %>%
+                          group_by(subject) %>%
+                          summarize(true_a = first(true_a), true_b = first(true_b)),
+                                                                                               by = "subject")
+
+# Plot for 'a'
+ggplot(comparison, aes(x = true_a, y = a)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  geom_smooth(method = "lm") + 
+  labs(title = "True vs Fitted Random Effects for a",
+       x = "True Random Effect (a)", y = "Fitted Random Effect (a)")
+
+ggplot(comparison, aes(x = true_a, y = true_b)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  geom_smooth(method = "lm") + 
+  labs(title = "True A vs True B",
+       x = "True Random Effect (a)", y = "True Random Effect (b)")
+
+# Plot for 'b'
+ggplot(comparison, aes(x = true_b, y = b)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  geom_smooth(method = "lm") + 
+  labs(title = "True vs Fitted Random Effects for b",
+       x = "True Random Effect (b)", y = "Fitted Random Effect (b)")
+
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+
+# 2. On Real Data with pdDiag
+
+## 2.1 Adults 
+
+```{r}
+adult_start_vals <- c(a = mean(adult_hab_no_last$trial_looking_time), b = -0.05)
+
+adult_model <- fit_nlme(adult_hab_no_last, adult_start_vals)
+adult_model_b_only <- fit_nlme_b_only(adult_hab_no_last, adult_start_vals)
+adult_model_a_only <- fit_nlme_a_only(adult_hab_no_last, adult_start_vals)
+
+
+anova.gls(adult_model, adult_model_b_only)
+anova(adult_model, adult_model_a_only)
+anova(adult_model_a_only, adult_model_b_only)
+
+VarCorr(adult_model)
+VarCorr(adult_model_a_only)
+VarCorr(adult_model_b_only)
+
+
+AIC_full <- AIC(adult_model)
+AIC_b_only <- AIC(adult_model_b_only)
+AIC_a_only <- AIC(adult_model_a_only)
+
+BIC_full <- BIC(adult_model)
+BIC_b_only <- BIC(adult_model_b_only)
+BIC_a_only <- BIC(adult_model_a_only)
+
+# Combine into a table
+model_comparison <- data.frame(
+  Model = c("Random a + b", "Random b only", "Random a only"),
+  AIC = c(AIC_full, AIC_b_only, AIC_a_only),
+  BIC = c(BIC_full, BIC_b_only, BIC_a_only)
+)
+
+model_comparison
+
+fixed_effects <- fixef(adult_model)
+
+fitted_random_effects <- ranef(adult_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+
+
+## 2.2 Preschooler
+
+```{r}
+preschooler_start_vals <- c(a = mean(preschooler_hab_no_last$trial_looking_time), b = -0.05)
+
+preschooler_model <- fit_nlme(preschooler_hab_no_last, preschooler_start_vals)
+fixed_effects <- fixef(preschooler_model)
+preschooler_model_b_only <- fit_nlme_b_only(preschooler_hab_no_last, preschooler_start_vals)
+preschooler_model_a_only <- fit_nlme_a_only(preschooler_hab_no_last, preschooler_start_vals)
+
+
+
+anova(preschooler_model, preschooler_model_b_only)
+anova(preschooler_model, preschooler_model_a_only)
+anova(preschooler_model_a_only, preschooler_model_b_only)
+
+VarCorr(preschooler_model)
+VarCorr(preschooler_model_a_only)
+VarCorr(preschooler_model_b_only)
+
+
+AIC_full <- AIC(preschooler_model)
+AIC_b_only <- AIC(preschooler_model_b_only)
+AIC_a_only <- AIC(preschooler_model_a_only)
+
+BIC_full <- BIC(preschooler_model)
+BIC_b_only <- BIC(preschooler_model_b_only)
+BIC_a_only <- BIC(preschooler_model_a_only)
+
+# Combine into a table
+model_comparison <- data.frame(
+  Model = c("Random a + b", "Random b only", "Random a only"),
+  AIC = c(AIC_full, AIC_b_only, AIC_a_only),
+  BIC = c(BIC_full, BIC_b_only, BIC_a_only)
+)
+
+fitted_random_effects <- ranef(preschooler_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+## 2.3 On Infant data 
+
+```{r}
+infant_start_vals <- c(a = mean(infant_hab_no_last$trial_looking_time), b = -0.05)
+
+infant_model <- fit_nlme(infant_hab_no_last, infant_start_vals)
+fixed_effects <- fixef(infant_model)
+infant_model_b_only <- fit_nlme_b_only(infant_hab_no_last, infant_start_vals)
+infant_model_a_only <- fit_nlme_a_only(infant_hab_no_last, infant_start_vals)
+
+
+
+anova(infant_model, infant_model_b_only)
+anova(infant_model, infant_model_a_only)
+anova(infant_model_a_only, infant_model_b_only)
+
+VarCorr(infant_model)
+VarCorr(infant_model_a_only)
+VarCorr(infant_model_b_only)
+
+
+AIC_full <- AIC(infant_model)
+AIC_b_only <- AIC(infant_model_b_only)
+AIC_a_only <- AIC(infant_model_a_only)
+
+BIC_full <- BIC(infant_model)
+BIC_b_only <- BIC(infant_model_b_only)
+BIC_a_only <- BIC(infant_model_a_only)
+
+# Combine into a table
+model_comparison <- data.frame(
+  Model = c("Random a + b", "Random b only", "Random a only"),
+  AIC = c(AIC_full, AIC_b_only, AIC_a_only),
+  BIC = c(BIC_full, BIC_b_only, BIC_a_only)
+)
+
+fitted_random_effects <- ranef(infant_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+
+# 3. On Real Data with pdSymm
+
+## 3.1 Adults 
+
+Model can't converge 
+
+```{r}
+adult_start_vals <- c(a = mean(adult_hab_no_last$trial_looking_time), b = -0.05)
+
+# Can't converge 
+#adult_model <- fit_nlme_pdSymm(adult_hab_no_last, adult_start_vals)
+
+
+```
+
+
+## 3.2 Preschooler
+
+False Convergence 
+
+```{r}
+preschooler_start_vals <- c(a = mean(preschooler_hab_no_last$trial_looking_time), b = -0.05)
+
+
+preschooler_model <- fit_nlme_pdSymm(preschooler_hab_no_last, preschooler_start_vals)
+fixed_effects <- fixef(preschooler_model)
+
+fitted_random_effects <- ranef(preschooler_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+## 3.3 On Infant data
+
+false convergence (8)
+
+```{r}
+infant_start_vals <- c(a = mean(infant_hab_no_last$trial_looking_time), b = -0.05)
+
+infant_model <- fit_nlme_pdSymm(infant_hab_no_last, infant_start_vals)
+fixed_effects <- fixef(infant_model)
+
+fitted_random_effects <- ranef(infant_model) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+```
+
+
+
+# 4. On Real Data but NLS 
+
+```{r}
+fit_single_subject_exp <- function(df) {
+
+  start_vals <- list(
+    a = max(df$trial_looking_time, na.rm = TRUE),
+    b = -0.05
+  )
+
+
+  nls_fit <- tryCatch(
+    nls(
+      trial_looking_time ~ a * exp(b * trial_number),
+      data    = df,
+      start   = start_vals,
+      control = nls.control(maxiter = 200)
+    ),
+    error = function(e) NULL
+  )
+  
+  # If the fit failed, return NA; otherwise return the estimated coefficients
+  if (is.null(nls_fit)) {
+    return(data.frame(a = NA_real_, b = NA_real_))
+  } else {
+    coefs <- coef(nls_fit)
+    return(data.frame(a = coefs["a"], b = coefs["b"]))
+  }
+}
+```
+
+## 4.1 Adults 
+
+```{r}
+adult_subject_estimates <- adult_hab_no_last %>%
+  group_by(subject) %>%
+  do(fit_single_subject_exp(.)) %>%
+  ungroup()
+
+cor(adult_subject_estimates$a, adult_subject_estimates$b, use = "complete.obs")
+
+adult_subject_estimates %>% 
+  ggplot(aes(x = a, y = b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+## 4.2 Preschooler 
+
+```{r}
+preschooler_subject_estimates <- preschooler_hab_no_last %>%
+  group_by(subject) %>%
+  do(fit_single_subject_exp(.)) %>%
+  ungroup()
+
+cor(preschooler_subject_estimates$a, preschooler_subject_estimates$b, use = "complete.obs")
+
+preschooler_subject_estimates %>% 
+  ggplot(aes(x = a, y = b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+## 4.3 Infants 
+
+```{r}
+
+
+infant_subject_estimates <- infant_hab_no_last %>%
+  group_by(subject) %>%
+  do(fit_single_subject_exp(.)) %>%
+  ungroup()
+
+cor(infant_subject_estimates$a, infant_subject_estimates$b, use = "complete.obs")
+
+infant_subject_estimates %>% 
+  ggplot(aes(x = a, y = b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+
+```
+

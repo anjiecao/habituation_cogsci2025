@@ -1,0 +1,86 @@
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(nlme)
+library(lme4)
+library(rugarch)
+library(ggthemes)
+library(car)
+```
+
+Goal: analyzing the relationship between habituation patterns and the dishabituation magnitude across three datasets. 
+
+- Adult dataset: https://onlinelibrary.wiley.com/doi/10.1111/tops.12631
+- Preschooler dataset: https://escholarship.org/uc/item/5f38t3cd 
+- Infant dataset: https://www.nature.com/articles/s41562-024-01965-x
+
+
+# 1. Dataset prepping 
+
+```{r}
+adult_d <- read_csv(here("data/raw/adult_data.csv"))
+preschooler_d <- read_csv(here("data/raw/preschooler_data.csv"))
+infant_d <- read_csv(here("data/raw/infant_data.csv"))
+```
+
+## 1.1 Prep adult dataset 
+
+Focusing on only the first block and blocks with more than two trials
+
+```{r}
+adult_habituation_data <- adult_d %>% 
+  # fist block
+  filter(block_number == 1) %>% 
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # filtering out blocks with only two trials
+  filter(deviant_position != 2) %>% 
+  # create complexity note
+  mutate(complexity = if_else(block_type == "complex_dissimilar", "complex", "simple")) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, complexity, trial_looking_time) 
+
+```
+
+
+
+
+## 1.2 Prep preschooler datset 
+
+```{r}
+# figure out what blocks to retain
+retained_blocks <- preschooler_d %>% 
+  distinct(subject, block_number, trial_number, trial_type) %>% 
+  filter(trial_type == "deviant") %>% 
+  filter(trial_number > 2) %>% 
+  filter(block_number == 1) %>% 
+  mutate(deviant_trial_number = trial_number)
+
+
+preschooler_habituation_data <- preschooler_d %>% 
+  # these are participants that have the first block meeting the criteria 
+  filter(subject %in% retained_blocks$subject) %>% 
+  filter(block_number == 1) %>% 
+  left_join(retained_blocks %>% select(-trial_number, -trial_type), by = c("subject", "block_number")) %>% 
+  filter(trial_number < deviant_trial_number) %>% 
+  select(subject, trial_number, trial_looking_time, age_in_months) 
+```
+
+
+## 1.3 Prep infant dataset 
+
+```{r}
+infant_habituation_data <- infant_d %>% 
+  select(paper, subj, specific_subject_id,agedays, starts_with("train")) %>% 
+  pivot_longer(cols = starts_with("train")) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(trial_number = str_replace(name, "train", "")) %>% 
+  rename(trial_looking_time = value) %>% 
+  rename(subject = specific_subject_id, age_in_days = agedays) %>% 
+  select(paper, subject, trial_number, trial_looking_time, age_in_days) %>% 
+  mutate(trial_number = as.numeric(trial_number))
+```
+
+

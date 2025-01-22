@@ -1,0 +1,370 @@
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+
+d <- read_csv("processed_rt_task_data.csv")
+```
+
+# Slope 
+
+First let's just focus on all first blocks? 
+
+```{r}
+slope_data <- d %>% 
+  filter(block_number == 1) %>% 
+  filter(trial_number < deviant_position) %>% 
+  filter(deviant_position != 2) %>% 
+  select(subject, trial_number, trial_looking_time) 
+```
+
+
+OK, first trying to fit individual exponential slope, but too much non-converging? 
+
+```{r}
+# Load necessary packages
+library(dplyr)
+
+# Initialize a list to store the slopes for each subject
+slopes <- data.frame(subject = unique(slope_data$subject), decay_rate = NA)
+
+# Loop over each subject
+for (subj in unique(slope_data$subject)) {
+  # Subset data for each subject
+  subject_data <- slope_data %>% filter(subject == subj)
+  
+  # Fit the exponential model using nls
+  tryCatch({
+    # Adjust starting values based on data characteristics
+    fit <- nls(trial_looking_time ~ a * exp(b * trial_number) + c, 
+               data = subject_data,
+               start = list(a = max(subject_data$trial_looking_time), 
+                            b = -0.05, 
+                            c = min(subject_data$trial_looking_time)))
+    
+    # Extract the decay rate (slope)
+    decay_rate <- coef(fit)["b"]
+    
+    # Store the result in the slopes data frame
+    slopes$decay_rate[slopes$subject == subj] <- decay_rate
+  }, error = function(e) {
+    message(paste("Model failed to converge for subject:", subj))
+  })
+}
+
+# View the slopes for each subject
+print(slopes)
+
+slopes %>% filter(!is.na(decay_rate))
+```
+
+now let's try the mixed model approach 
+
+
+```{r}
+
+library(lme4)
+
+# Adjust starting values if the model has trouble converging
+start_a <- max(slope_data$trial_looking_time)
+start_b <- -0.05 
+start_c <- min(slope_data$trial_looking_time)
+
+# Fit the nonlinear mixed-effects model
+mixed_exp_model <- nlmer(
+  trial_looking_time ~ a * exp(b * trial_number) + c ~ (b | subject),  # Formula for exponential decay with random slopes on b
+  data = slope_data,
+  start = c(a = max(slope_data$trial_looking_time), 
+            b = -0.05, 
+            c = min(slope_data$trial_looking_time)) 
+)
+
+mixed_exp_model <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),  # Simplified exponential decay model
+  data = slope_data,
+  fixed = a + b ~ 1,                # Fixed effects for a and b
+  random = b ~ 1 | subject,         # Random effect for b (decay rate) by subject
+  start = c(a = max(slope_data$trial_looking_time), b = -0.05)  # Starting values
+)
+
+# Summary of the model to view the fixed and random effects
+summary(mixed_exp_model)
+
+# Extract random effects (individual decay rates)
+random_effects <- ranef(mixed_exp_model)$b
+
+# Combine fixed effect with random effect for individual slopes
+fixed_decay_rate <- fixef(mixed_exp_model)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+# Create a data frame to store the slopes for each participant
+slopes <- data.frame(
+  subject = rownames(ranef(mixed_exp_model)),
+  decay_rate = individual_decay_rates
+)
+
+# View the individual slopes for each participant
+print(slopes)
+
+
+```
+
+
+OK yay this works!! now let's see if it predicts anything about the dishabituation?!?!?!
+
+```{r}
+
+test_d <- d %>% 
+  filter(block_number == 1) %>% 
+  filter(trial_number == deviant_position) %>% 
+  filter(deviant_position != 2) %>% 
+  select(subject, block_type, trial_looking_time) %>% 
+  left_join(slopes, by = c("subject")) 
+
+
+test_d %>% 
+  ggplot(aes(x = decay_rate, y = trial_looking_time)) + 
+  geom_point(aes(color = block_type)) + 
+  theme_few() 
+  
+lm(trial_looking_time ~ decay_rate + block_type , data = test_d) %>% 
+  summary()
+
+
+```
+
+
+but doesn't control for general sloweness of the person????
+
+
+what if we do something like controlling using the average time 
+
+- high collinearity, also no more significant value :| 
+
+
+```{r}
+
+mean_lt_d <- d %>% 
+  filter(block_number == 1) %>% 
+  filter(deviant_position != 2) %>% 
+  group_by(subject, block_type) %>% 
+  filter(trial_number < deviant_position) %>% 
+  summarise(mean_lt = mean(trial_looking_time)) 
+
+test_d_with_mean <- test_d %>% 
+  left_join(mean_lt_d, by = c("subject", "block_type")) 
+
+model <- lm(trial_looking_time ~ decay_rate + block_type + mean_lt , data = test_d_with_mean) 
+
+model %>% 
+  summary()
+
+library(car)
+vif(model)
+```
+
+ok maybe something slightly more fancy like residual of something???
+
+log(looking time) ~ I((exp(1)**(-trial_number))) * item_type * trial_complexity + (trial_number * item_type * trial_complexity|subject)
+
+```{r}
+full_model <- lmerTest::lmer(log(trial_looking_time) ~ I(exp(1)**(-trial_number)) * trial_type * block_type + (1 | subject), data = d)
+
+d$resid <- resid(full_model)
+
+# resid at dishabituation magnitude
+resid_d <- d %>% 
+  filter(block_number == 1) %>% 
+  filter(trial_number == deviant_position) %>% 
+  filter(deviant_position != 2) %>% 
+  select(subject, resid)
+
+
+test_d_with_residual <- test_d %>% 
+  left_join(resid_d, by = c("subject")) 
+
+
+
+test_d_with_residual %>% 
+  ggplot(aes(x = decay_rate, y = resid, color = block_type)) + 
+  geom_point() + 
+  theme_few() 
+
+
+lm(resid ~ decay_rate + block_type  , data = test_d_with_residual)  %>% summary()
+
+
+```
+
+
+
+
+
+# Volatility measure 
+
+
+
+```{r}
+library(rugarch)
+
+# Initialize an empty list to store GARCH volatility results
+garch_volatility_list <- list()
+
+# Group by participant and calculate each volatility measure
+volatility_summary <- slope_data %>%
+  group_by(subject) %>%
+  summarize(
+    # 1. Standard Deviation
+    sd_volatility = sd(trial_looking_time, na.rm = TRUE),
+    
+    # 2. Mean Absolute Deviation (MAD)
+    mad_volatility = mean(abs(trial_looking_time - mean(trial_looking_time, na.rm = TRUE)), na.rm = TRUE),
+    
+    # 3. Coefficient of Variation (CV)
+    cv_volatility = sd(trial_looking_time, na.rm = TRUE) / mean(trial_looking_time, na.rm = TRUE),
+    
+    # 4. Range-Based Volatility
+    range_volatility = max(trial_looking_time, na.rm = TRUE) - min(trial_looking_time, na.rm = TRUE),
+    
+    # 5. Median Absolute Deviation (MAD - Robust Version)
+    mad_robust_volatility = median(abs(trial_looking_time - median(trial_looking_time, na.rm = TRUE)), na.rm = TRUE)
+  )
+
+
+# Calculate GARCH-based volatility for each participant and add to the volatility_summary
+for (subject_id in unique(slope_data$subject)) {
+  # Subset data for each participant
+  participant_data <- filter(slope_data, subject == subject_id)$looking_time
+  
+  # Specify and fit GARCH model if there are enough data points
+  if (length(participant_data) > 5) {  # Minimum data points to fit GARCH - doesn't work 
+    spec <- ugarchspec(variance.model = list(model = "sGARCH"), mean.model = list(armaOrder = c(1, 1)))
+    fit <- tryCatch(ugarchfit(spec = spec, data = participant_data), error = function(e) NULL)
+    
+    if (!is.null(fit)) {
+      # Extract the average conditional volatility from the GARCH model
+      avg_garch_volatility <- mean(sigma(fit), na.rm = TRUE)
+    } else {
+      avg_garch_volatility <- NA
+    }
+  } else {
+    avg_garch_volatility <- NA
+  }
+  
+  # Add the GARCH volatility to the list for each subject
+  garch_volatility_list[[as.character(subject_id)]] <- avg_garch_volatility
+}
+
+# Convert GARCH volatility list to data frame and merge with other volatility measures
+garch_volatility_df <- data.frame(
+  subject = names(garch_volatility_list),
+  garch_volatility = unlist(garch_volatility_list)
+)
+
+# Combine the GARCH results with the other volatility measures
+volatility_summary <- left_join(volatility_summary, garch_volatility_df, by = "subject")
+
+# View the final summary
+print(volatility_summary)
+
+```
+
+```{r}
+volatility_summary %>% 
+  left_join(test_d %>% select(-decay_rate), by = "subject") %>% 
+  pivot_longer(cols = sd_volatility: mad_robust_volatility) %>% 
+  ggplot(aes(x = value, y = trial_looking_time)) + 
+  geom_point(aes(color = block_type)) + 
+  facet_wrap(~name, scales = "free")
+
+
+volatility_summary %>% 
+  left_join(test_d %>% select(-decay_rate), by = "subject") %>% 
+  left_join(resid_d, by = "subject") %>% 
+  pivot_longer(cols = sd_volatility: mad_robust_volatility) %>% 
+  ggplot(aes(x = value, y = resid)) + 
+  geom_point(aes(color = block_type)) + 
+  facet_wrap(~name, scales = "free")
+```
+
+```{r}
+volatility_full_d <- volatility_summary %>% 
+  left_join(test_d %>% select(-decay_rate), by = "subject") %>% 
+  left_join(resid_d, by = "subject") 
+
+lm(resid ~ sd_volatility, data = volatility_full_d)  %>% summary()
+lm(resid ~ mad_volatility, data = volatility_full_d)  %>% summary()
+lm(resid ~ cv_volatility, data = volatility_full_d)  %>% summary()
+lm(resid ~ range_volatility, data = volatility_full_d)  %>% summary()
+lm(resid ~ mad_robust_volatility, data = volatility_full_d)  %>% summary()
+
+
+# lol this is terrible 
+all_volatility_model <- lm(resid ~ sd_volatility + mad_volatility + cv_volatility + range_volatility + mad_robust_volatility, data = volatility_full_d) 
+vif(all_volatility_model)
+
+
+sd_v_model <- lm(resid ~ sd_volatility, data = volatility_full_d) 
+mad_v_model <- lm(resid ~ mad_volatility, data = volatility_full_d) 
+cv_v_model <- lm(resid ~ cv_volatility, data = volatility_full_d)
+range_v_model <- lm(resid ~ range_volatility, data = volatility_full_d) 
+mad_robust_v_model <- lm(resid ~ mad_robust_volatility, data = volatility_full_d)  
+
+models <- list(sd_v_model, mad_v_model, cv_v_model, range_v_model, mad_robust_v_model)
+metrics <- sapply(models, function(model) c(Adjusted_R2 = summary(model)$adj.r.squared,
+                                            AIC = AIC(model),
+                                            BIC = BIC(model)))
+metrics_df <- as.data.frame(t(metrics))
+rownames(metrics_df) <- c("SD Volatility", "MAD Volatility", "CV Volatility", "Range Volatility", "MAD Robust Volatility")
+metrics_df
+
+```
+
+# volatility + slope 
+
+
+```{r}
+v_and_slope_d <- test_d_with_residual %>% 
+  left_join(volatility_full_d %>% select(-resid, -trial_looking_time, -block_type), by = "subject") 
+
+lm(resid ~ decay_rate + sd_volatility + block_type, data = v_and_slope_d) %>% summary()
+```
+
+
+other features of the dataset???
+
+- age?????
+- complexity??? (social vs non-social???)
+
+
+
+```{r}
+d %>% View()
+```
+
+
+
+
+
+
+
+
+
+# Everything together 
+
+```{r}
+d %>% 
+  # get rid of post dishabituation habituation trial 
+  filter(trial_number < deviant_position) %>% 
+  #filter(block_number == 1) %>% 
+  filter(block_type == "complex_dissimilar") %>% 
+  filter(deviant_position != 2) %>% 
+  ungroup() %>% 
+  #filter(subject %in% (d %>% distinct(subject) %>% head(10) %>% pull())) %>% 
+  ggplot(aes(x = as.character(trial_number), y = trial_looking_time, group = subject, color = as.factor(deviant_position))) + 
+  geom_line(alpha = .3) + 
+  geom_point(alpha = .1) + 
+  theme_few() + 
+  facet_wrap(~block_number)
+```
+

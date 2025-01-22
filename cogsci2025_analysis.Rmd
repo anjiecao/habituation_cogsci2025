@@ -1,0 +1,790 @@
+
+```{r}
+library(tidyverse)
+library(here)
+library(lme4)
+library(nlme)
+library(ggcorrplot)
+
+# load real data
+# adult
+
+# take out 1 trial particiapnt
+adult_hab_full <- read_csv(here("data/raw/adult_hab_full.csv")) %>% filter(subject != "SS1630948678486") 
+adult_hab_no_last <- read_csv(here("data/raw/adult_hab_no_last.csv")) %>% filter(subject != "SS1630948678486")
+adult_dishab <- read_csv(here("data/raw/adult_dishab.csv")) %>% filter(subject != "SS1630948678486")
+
+adult_age <- read_csv(here("data/raw/adult_age.csv"))
+adult_complexity <- read_csv(here("data/raw/adult_complexity.csv"))
+
+
+# preschooler
+preschooler_hab_full <- read_csv(here("data/raw/preschooler_hab_full.csv"))
+preschooler_hab_no_last <- read_csv(here("data/raw/preschooler_hab_no_last.csv"))
+preschooler_dishab <- read_csv(here("data/raw/preschooler_dishab.csv"))
+preschooler_age <- read_csv(here("data/raw/preschooler_age.csv"))
+
+
+
+# infant
+infant_bad <- read_csv(here("data/raw/infant_bad.csv"))
+infant_one_trial <- read_csv(here("data/raw/infant_one_trial.csv"))
+
+infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv")) %>%  filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+infant_dishab <- read_csv(here("data/raw/infant_dishab.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+infant_age <- read_csv(here("data/raw/infant_age.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+infant_complexity <- read_csv(here("data/raw/infant_complexity.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+
+
+
+source(here("helper/fit_model.R"))
+source(here("helper/compare_model.R"))
+source(here("helper/format_data.R"))
+source(here("helper/slope.R"))
+source(here("helper/resid.R"))
+source(here("helper/volatility.R"))
+```
+
+
+# 1. Fit models 
+
+## 1.1 Adults 
+
+```{r}
+adult_start_vals <- c(a = mean(adult_hab_no_last$trial_looking_time), b = -0.05)
+
+adult_model_full <- fit_nlme_full(adult_hab_no_last, adult_start_vals)
+adult_model_a_only <- fit_nlme_a_only(adult_hab_no_last, adult_start_vals)
+adult_model_b_only <- fit_nlme_b_only(adult_hab_no_last, adult_start_vals)
+
+```
+
+## 1.2 Preschooler 
+
+```{r}
+preschooler_start_vals <- c(a = mean(preschooler_hab_no_last$trial_looking_time), b = -0.05)
+
+preschooler_model_full <- fit_nlme_full(preschooler_hab_no_last, preschooler_start_vals)
+preschooler_model_a_only <- fit_nlme_a_only(preschooler_hab_no_last, preschooler_start_vals)
+preschooler_model_b_only <- fit_nlme_b_only(preschooler_hab_no_last, preschooler_start_vals)
+```
+
+## 1.3 Infants
+
+```{r}
+infant_start_vals <- c(a = mean(infant_hab_no_last$trial_looking_time), b = -0.05)
+
+infant_model_full <- fit_nlme_full(infant_hab_no_last, infant_start_vals)
+infant_model_a_only <- fit_nlme_a_only(infant_hab_no_last, infant_start_vals)
+infant_model_b_only <- fit_nlme_b_only(infant_hab_no_last, infant_start_vals)
+```
+
+
+# 2. Model comparisons 
+
+```{r}
+model_names <- c("full", "a only", "b only")
+
+adult_comparisons <- compare_models(list(adult_model_full, adult_model_a_only, adult_model_b_only), 
+               model_names) %>% mutate(group = "adults")
+
+preschooler_comparisons <- compare_models(list(preschooler_model_full, preschooler_model_a_only, preschooler_model_b_only), 
+               model_names) %>% mutate(group = "preschoolers")
+
+infant_comparisons <- compare_models(list(infant_model_full, infant_model_a_only, infant_model_b_only), 
+               model_names)%>% mutate(group = "infants")
+
+
+adult_comparisons
+preschooler_comparisons
+infant_comparisons
+```
+
+# 3. Get winning model and look into what we want 
+
+- adult: b only 
+- preschooler: b only 
+- infant: full 
+
+
+## 2.1. get all the results 
+
+
+```{r}
+hab_no_last_datasets <- list(adult_hab_no_last, preschooler_hab_no_last, infant_hab_no_last)  
+hab_full_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)
+dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)
+
+# Get slopes for all hab datasets
+adult_slope_no_last <- get_individual_slope(adult_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
+preschooler_slope_no_last <- get_individual_slope(preschooler_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
+infant_slope_no_last <- get_individual_slope(infant_hab_no_last, random_structure = list(subject = pdDiag(a + b ~ 1)))
+
+slopes_no_last <- list(adult_slope_no_last, preschooler_slope_no_last, infant_slope_no_last)
+diff_raw <- map2(hab_full_datasets, dev_datasets, get_diff_raw_looking_time)
+
+
+# Left join for each pair of datasets 
+joined_results_no_last <- map2(slopes_no_last, diff_raw, ~ left_join(.x, .y, by = "subject"))
+
+
+bind_rows(
+  joined_results_no_last[[1]] %>% mutate(group = "1_adult"), 
+  joined_results_no_last[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results_no_last[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = log_hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+bind_rows(
+  joined_results_no_last[[1]] %>% mutate(group = "1_adult"), 
+  joined_results_no_last[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results_no_last[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+```
+
+## 2.2. run all the models
+
+```{r}
+all_model_results_no_last_model_log <- bind_rows(joined_results_no_last[[1]] %>% mutate(group = "adult"), 
+          joined_results_no_last[[2]] %>% mutate(group = "preschooler"),
+          joined_results_no_last[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    log_model = map(data, ~ lm(log_hab_dev_diff ~ decay_rate, data = .)), 
+    log_res = map(log_model, ~ broom::tidy(., conf.int = TRUE))
+  ) %>% 
+  unnest(c(log_res)) %>% 
+  mutate_if(is.numeric, round, 2)
+
+all_model_results_no_last_model_no_log <- bind_rows(joined_results_no_last[[1]] %>% mutate(group = "adult"), 
+          joined_results_no_last[[2]] %>% mutate(group = "preschooler"),
+          joined_results_no_last[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(hab_dev_diff ~ decay_rate, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE))
+  ) %>% 
+  unnest(c(res)) %>% 
+  mutate_if(is.numeric, round, 2)
+
+
+all_model_results_no_last_model_log
+all_model_results_no_last_model_no_log
+
+all_model_results_no_last_model_log %>% 
+  filter(term == "decay_rate") %>% 
+  ggplot(aes(x= group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() +
+  geom_hline(yintercept = 0) + 
+  coord_flip() 
+
+all_model_results_no_last_model_no_log %>% 
+  filter(term == "decay_rate") %>% 
+  ggplot(aes(x= group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() +
+  geom_hline(yintercept = 0) + 
+  coord_flip() 
+  
+```
+
+# 4. Try alternative calculation 
+
+## 4.1. The model comparison thing again 
+
+```{r}
+adult_start_vals <- c(a = mean(adult_hab_full$trial_looking_time), b = -0.05)
+adult_model_full <- fit_nlme_full(adult_hab_full, adult_start_vals)
+adult_model_a_only <- fit_nlme_a_only(adult_hab_full, adult_start_vals)
+adult_model_b_only <- fit_nlme_b_only(adult_hab_full, adult_start_vals)
+
+preschooler_start_vals <- c(a = mean(preschooler_hab_full$trial_looking_time), b = -0.05)
+preschooler_model_full <- fit_nlme_full(preschooler_hab_full, preschooler_start_vals)
+preschooler_model_a_only <- fit_nlme_a_only(preschooler_hab_full, preschooler_start_vals)
+preschooler_model_b_only <- fit_nlme_b_only(preschooler_hab_full, preschooler_start_vals)
+
+
+infant_start_vals <- c(a = mean(infant_hab_full$trial_looking_time), b = -0.05)
+infant_model_full <- fit_nlme_full(infant_hab_full, infant_start_vals)
+infant_model_a_only <- fit_nlme_a_only(infant_hab_full, infant_start_vals)
+infant_model_b_only <- fit_nlme_b_only(infant_hab_full, infant_start_vals)
+
+model_names <- c("full", "a only", "b only")
+
+adult_comparisons <- compare_models(list(adult_model_full, adult_model_a_only, adult_model_b_only), 
+               model_names) %>% mutate(group = "adults")
+
+preschooler_comparisons <- compare_models(list(preschooler_model_full, preschooler_model_a_only, preschooler_model_b_only), 
+               model_names) %>% mutate(group = "preschoolers")
+
+infant_comparisons <- compare_models(list(infant_model_full, infant_model_a_only, infant_model_b_only), 
+               model_names)%>% mutate(group = "infants")
+
+
+adult_comparisons
+preschooler_comparisons
+infant_comparisons
+```
+
+## 4.2 get residuals and the thing we wnat 
+
+
+
+```{r}
+hab_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)  
+dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)  
+
+adult_residuals_full <- get_hab_residual(adult_hab_full, random_structure =  list(subject = pdDiag(b ~ 1)))
+preschooler_residuals_full <- get_hab_residual(preschooler_hab_full, random_structure =  list(subject = pdDiag( b ~ 1)))
+infant_residuals_full <- get_hab_residual(infant_hab_full, random_structure =  list(subject = pdDiag(a + b ~ 1)))
+
+# Get hab residuals for all hab datasets
+hab_residuals_full <- list(adult_residuals_full, preschooler_residuals_full, infant_residuals_full)
+
+# Get dev residuals for all dev datasets
+dev_residuals_full <- map(dev_datasets, get_dev_residual)
+
+# get difference and ratio
+resid_diffs <- map2(hab_residuals_full, dev_residuals_full, calculate_resid_diff)
+
+
+adult_slope_full <- get_individual_slope(adult_hab_full, random_structure = list(subject = pdDiag( b ~ 1)))
+preschooler_slope_full <- get_individual_slope(preschooler_hab_full, random_structure = list(subject = pdDiag( b ~ 1)))
+infant_slope_full <- get_individual_slope(infant_hab_full, random_structure = list(subject = pdDiag(a + b ~ 1)))
+infant_intercepts_full <- get_individual_intercept(infant_hab_full, random_structure = list(subject = pdDiag(a + b ~ 1)))
+
+
+slopes_full <- list(adult_slope_full, preschooler_slope_full, infant_slope_full)
+
+
+
+
+joined_results_full <- map2(slopes_full, resid_diffs, ~ left_join(.x, .y, by = "subject"))
+
+
+bind_rows(
+  joined_results_full[[1]] %>% mutate(group = "1_adult"), 
+  joined_results_full[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results_full[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = resid_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+bind_rows(
+  joined_results_full[[1]] %>% mutate(group = "1_adult") , 
+  joined_results_full[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results_full[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = resid_ratio)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+```
+
+
+
+
+## 4.3 run all the models 
+
+```{r}
+joined_results_full_model <- bind_rows(joined_results_full[[1]] %>% mutate(group = "adult"), 
+          joined_results_full[[2]] %>% mutate(group = "preschooler"),
+          joined_results_full[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(resid_diff ~ decay_rate, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE))
+  ) %>% 
+  unnest(res) %>% 
+  mutate_if(is.numeric, round, 2)
+
+joined_results_full_model
+
+joined_results_full_model %>% 
+  filter(term == "decay_rate") %>% 
+  ggplot(aes(x= group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() +
+  geom_hline(yintercept = 0) + 
+  coord_flip() 
+```
+
+```{r}
+joined_results_full_model_ratio <- bind_rows(joined_results_full[[1]] %>% mutate(group = "adult"), 
+          joined_results_full[[2]] %>% mutate(group = "preschooler"),
+          joined_results_full[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(resid_ratio ~ decay_rate, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE))
+  ) %>% 
+  unnest(res) %>% 
+  mutate_if(is.numeric, round, 2)
+
+joined_results_full_model
+
+joined_results_full_model_ratio %>% 
+  filter(term == "decay_rate") %>% 
+  ggplot(aes(x= group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() +
+  geom_hline(yintercept = 0) + 
+  coord_flip() 
+```
+
+## 4.4 special infant stuff
+
+```{r}
+infant_slope_full %>% left_join(infant_intercepts_full, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = intercept)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+
+infant_special_d <- infant_slope_full %>% 
+  left_join(infant_intercepts_full, by = c("subject")) %>% 
+  left_join(resid_diffs[[3]], by = c("subject")) 
+
+
+infant_special_d
+
+lm(resid_diff ~ intercept + decay_rate, data = infant_special_d) %>% 
+  summary()
+```
+
+
+# 5. Other predictors 
+
+get volatility measure (residuals SD!)
+get age 
+get complexity 
+
+## 5.1. Volatility measure 
+
+```{r}
+
+# full residuals 
+adult_residuals_full <- get_hab_residual(adult_hab_full, random_structure =  list(subject = pdDiag(b ~ 1)))
+preschooler_residuals_full <- get_hab_residual(preschooler_hab_full, random_structure =  list(subject = pdDiag( b ~ 1)))
+infant_residuals_full <- get_hab_residual(infant_hab_full, random_structure =  list(subject = pdDiag(a + b ~ 1)))
+
+all_residuals <- list(adult_residuals_full, preschooler_residuals_full, infant_residuals_full)
+all_residuals_sd_full <- map(all_residuals, get_residual_sd)
+
+
+# no last residuals 
+adult_residuals_no_last <- get_hab_residual(adult_hab_no_last, random_structure =  list(subject = pdDiag(b ~ 1)))
+preschooler_residuals_no_last <- get_hab_residual(preschooler_hab_no_last, random_structure =  list(subject = pdDiag( b ~ 1)))
+infant_residuals_no_last <- get_hab_residual(infant_hab_no_last, random_structure =  list(subject = pdDiag(a + b ~ 1)))
+
+all_residuals_no_last <- list(adult_residuals_no_last, preschooler_residuals_no_last, infant_residuals_no_last)
+all_residuals_sd_no_last <- map(all_residuals_no_last, get_residual_sd)
+
+```
+
+## 5.2 age and complexity 
+
+```{r}
+
+# full
+
+adult_additional_measures_full <- all_residuals_sd_full[[1]] %>% 
+  left_join(adult_age, by = c("subject")) %>% 
+  left_join(adult_complexity, by = c("subject"))
+adult_additional_measures_full <- na.omit(adult_additional_measures_full)  
+
+preschooler_additional_measures_full <- all_residuals_sd_full[[2]] %>% 
+  left_join(preschooler_age, by = c("subject")) 
+preschooler_additional_measures_full <- na.omit(preschooler_additional_measures_full)
+
+infant_additional_measures_full <- all_residuals_sd_full[[3]] %>% 
+  left_join(infant_age, by = c("subject")) %>% 
+  left_join(infant_complexity, by  = c("subject"))
+infant_additional_measures_full <- na.omit(infant_additional_measures_full)
+
+# no last
+adult_additional_measures_no_last <- all_residuals_sd_no_last[[1]] %>% 
+  left_join(adult_age, by = c("subject")) %>% 
+  left_join(adult_complexity, by = c("subject"))
+adult_additional_measures_no_last <- na.omit(adult_additional_measures_no_last)
+
+preschooler_additional_measures_no_last <- all_residuals_sd_no_last[[2]] %>% 
+  left_join(preschooler_age, by = c("subject")) 
+preschooler_additional_measures_no_last <- na.omit(preschooler_additional_measures_no_last)
+
+infant_additional_measures_no_last <- all_residuals_sd_no_last[[3]] %>% 
+  left_join(infant_age, by = c("subject")) %>% 
+  left_join(infant_complexity, by  = c("subject"))
+infant_additional_measures_no_last <- na.omit(infant_additional_measures_no_last)
+
+
+```
+
+
+## 5.3 put everything everything together, two ways 
+
+```{r}
+additional_measure_full <- list(adult_additional_measures_full, preschooler_additional_measures_full, infant_additional_measures_full)
+additional_measure_no_last <- list(adult_additional_measures_no_last, preschooler_additional_measures_no_last, infant_additional_measures_no_last)
+```
+
+
+```{r}
+all_measures_full <- map2(joined_results_full, additional_measure_full, ~ left_join(.x, .y, by = "subject"))
+all_measures_no_last <- map2(joined_results_no_last, additional_measure_no_last, ~ left_join(.x, .y, by = "subject"))
+```
+
+
+## 5.4 run model
+
+```{r}
+bind_rows(all_measures_no_last[[1]] %>% mutate(group = "adult"), 
+          all_measures_no_last[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(log_hab_dev_diff ~ decay_rate + age + complexity + sd_resid, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE))
+  ) %>% 
+  unnest(res) %>% 
+  mutate_if(is.numeric, round, 2)
+
+
+broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data =  all_measures_no_last[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+```
+
+
+```{r}
+
+bind_rows(all_measures_full[[1]] %>% mutate(group = "adult"), 
+          all_measures_full[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(resid_diff ~ decay_rate + age + complexity + sd_resid, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE)), 
+    vif = map(model, ~ car::vif(.))
+  ) %>% 
+  unnest(vif) %>% 
+  mutate_if(is.numeric, round, 2)
+
+broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid, data =  all_measures_full[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+
+
+
+all_measures_no_last
+```
+
+
+# correlation of decay rate
+
+note that some data are misisng 
+
+```{r}
+setdiff(union(slopes_full[[1]]$subject, slopes_no_last[[1]]$subject), intersect(slopes_no_last[[1]]$subject, slopes_full[[1]]$subject))
+
+adult_hab_full %>% 
+  filter(subject == "SS1630948678486") %>% 
+  group_by(subject) %>% 
+  count()
+```
+```{r}
+missing_one_infants <- setdiff(union(slopes_full[[3]]$subject, slopes_no_last[[3]]$subject), intersect(slopes_no_last[[3]]$subject, slopes_full[[3]]$subject))
+
+#tibble(subject = missing_one_infants) %>% write_csv(here("data/raw/infant_one_trial.csv"))
+
+
+infant_hab_full %>% 
+  filter(subject %in% missing_one_infants) %>% 
+  group_by(subject) %>% 
+  count()
+```
+
+
+```{r}
+cor(slopes_full[[1]]$decay_rate, slopes_no_last[[1]]$decay_rate)
+cor(slopes_full[[2]]$decay_rate, slopes_no_last[[2]]$decay_rate)
+cor(slopes_full[[3]]$decay_rate, slopes_no_last[[3]]$decay_rate)
+
+```
+
+```{r}
+slopes_full[[1]] %>% 
+  left_join( slopes_no_last[[1]], by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate.x, y = decay_rate.y)) + 
+  geom_point() + 
+  labs(title = "adult")
+```
+
+```{r}
+slopes_full[[2]] %>% 
+  left_join( slopes_no_last[[2]], by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate.x, y = decay_rate.y)) + 
+  geom_point() + 
+  labs(title = "preschooler")
+```
+
+```{r}
+slopes_full[[3]] %>% 
+  left_join( slopes_no_last[[3]], by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate.x, y = decay_rate.y)) + 
+  geom_point() + 
+  labs(title = "infant")
+```
+
+# correlation matrix on all the predictors 
+
+
+```{r}
+cor_results_full <- bind_rows(
+  all_measures_full[[1]] %>% mutate(group = "adult"),
+  all_measures_full[[2]] %>% mutate(group = "preschooler"),
+  all_measures_full[[3]] %>% mutate(group = "infant")
+) %>% 
+  nest(data = -group) %>%  # Nest data by group
+  mutate(
+    cor_matrix = map(data, ~ cor(select(.x,  decay_rate, age, sd_resid) %>% mutate_all(as.numeric), use = "complete.obs"))
+  ) 
+
+
+plot_cor_matrix <- function(cor_matrix, group_name) {
+  ggcorrplot(cor_matrix, 
+             lab = TRUE,  # Show correlation values
+             outline.color = "white",
+             colors = c("blue", "white", "red"),  # Low to high correlation
+             title = paste("Correlation Matrix -", group_name)) +
+    theme_minimal()
+}
+
+cor_results_full %>%
+  mutate(plot = map2(cor_matrix, group, plot_cor_matrix)) %>%
+  pull(plot)
+```
+
+
+```{r}
+cor_results_no_last <- bind_rows(
+  all_measures_no_last[[1]] %>% mutate(group = "adult"),
+  all_measures_no_last[[2]] %>% mutate(group = "preschooler"),
+  all_measures_no_last[[3]] %>% mutate(group = "infant")
+) %>% 
+  nest(data = -group) %>%  # Nest data by group
+  mutate(
+    cor_matrix = map(data, ~ cor(select(.x, log_hab_dev_diff, decay_rate, age, sd_resid) %>% mutate_all(as.numeric), use = "complete.obs"))
+  ) 
+
+
+cor_results_no_last %>%
+  mutate(plot = map2(cor_matrix, group, plot_cor_matrix)) %>%
+  pull(plot)
+```
+# correlation between two measures 
+
+```{r}
+all_measures_no_last[[1]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[1]] %>% select(subject, resid_dev)) %>% 
+  ggplot(aes(x = log_hab_dev_diff, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+all_measures_no_last[[2]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[2]] %>% select(subject, resid_dev)) %>% 
+  ggplot(aes(x = log_hab_dev_diff, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+all_measures_no_last[[3]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[3]] %>% select(subject, resid_dev)) %>% 
+  ggplot(aes(x = log_hab_dev_diff, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+
+meausre_cor_adults <- all_measures_no_last[[1]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[1]] %>% select(subject, resid_dev))
+
+meausre_cor_preschoolers <- all_measures_no_last[[2]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[2]] %>% select(subject, resid_dev))
+
+meausre_cor_infants <- all_measures_no_last[[3]] %>% 
+  select(subject, log_hab_dev_diff) %>% 
+  left_join(all_measures_full[[3]] %>% select(subject, resid_dev))
+
+
+
+
+```
+
+```{r}
+cor(meausre_cor_adults$log_hab_dev_diff, meausre_cor_adults$resid_dev, use = "complete.obs")
+cor(meausre_cor_preschoolers$log_hab_dev_diff, meausre_cor_preschoolers$resid_dev, use = "complete.obs")
+cor(meausre_cor_infants$log_hab_dev_diff, meausre_cor_infants$resid_dev,use = "complete.obs")
+```
+
+
+```{r}
+bind_rows(
+  meausre_cor_adults %>% mutate(group = "adults"),
+  meausre_cor_preschoolers %>% mutate(group = "preschoolers"),
+  meausre_cor_infants %>% mutate(group = "infants")
+) %>% 
+  ggplot(aes(x = resid_dev, y= log_hab_dev_diff)) + 
+  geom_point() + 
+  facet_wrap(~group, scales = "free") + 
+  geom_smooth(method = "lm")
+
+```
+
+
+# Raw data plots 
+
+```{r}
+adult_hab_full %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(aes(group = subject), alpha = .1)
+```
+
+
+```{r}
+adult_hab_full %>% 
+  bind_rows(adult_dishab) %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time, color = trial_type, group = subject)) + 
+  geom_point(alpha = .3) + 
+  geom_line(aes(group = subject), alpha = .3)
+```
+
+```{r}
+preschooler_hab_full %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(aes(group = subject), alpha = .1)
+```
+```{r}
+preschooler_hab_full %>% 
+  bind_rows(preschooler_dishab) %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time, color = trial_type, group = subject)) + 
+  geom_point(alpha = .3) + 
+  geom_line(aes(group = subject), alpha = .3)
+```
+
+
+```{r}
+infant_hab_full %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(aes(group = subject), alpha = .1)
+```
+
+```{r}
+infant_hab_full %>% 
+  bind_rows(infant_dishab) %>% 
+  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time, color = trial_type, group = subject)) + 
+  geom_point(alpha = .3) + 
+  geom_line(aes(group = subject), alpha = .3)
+```
+
+# Model estimate plots 
+
+```{r}
+model_estimates_df_full <- bind_rows(all_measures_full[[1]] %>% mutate(group = "adult"), 
+          all_measures_full[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(resid_diff ~ decay_rate + age + complexity + sd_resid, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE)), 
+    vif = map(model, ~ car::vif(.))
+  ) %>% 
+  unnest(res) %>% 
+  mutate_if(is.numeric, round, 2) %>% 
+  bind_rows(
+    
+    broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid, data =  all_measures_full[[2]]), 
+  conf.int = TRUE
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler") 
+  ) %>% 
+  mutate(is_sig = (p.value < 0.05)) %>% 
+  filter(term != "(Intercept)")
+
+model_estimates_df_full %>%
+  ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high, color = is_sig)) + 
+  geom_pointrange(position = position_dodge(width = .2)) + 
+  facet_wrap(~term, scales = "free") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + 
+  coord_flip()  + 
+  ggthemes::theme_few() + 
+  theme(legend.position = "top")
+
+
+```
+
+```{r}
+model_estimates_df_no_last <- bind_rows(all_measures_no_last[[1]] %>% mutate(group = "adult"), 
+          all_measures_no_last[[3]] %>% mutate(group = "infant")) %>% 
+  group_by(group) %>% 
+  nest() %>% 
+  mutate(
+    model = map(data, ~ lm(log_hab_dev_diff ~ decay_rate + age + complexity + sd_resid, data = .)), 
+    res = map(model, ~ broom::tidy(., conf.int = TRUE)), 
+    vif = map(model, ~ car::vif(.))
+  ) %>% 
+  unnest(res) %>% 
+  mutate_if(is.numeric, round, 2) %>% 
+  bind_rows(
+    
+    broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data =  all_measures_no_last[[2]]), 
+  conf.int = TRUE
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler") 
+  ) %>% 
+  mutate(is_sig = (p.value < 0.05)) %>% 
+  filter(term != "(Intercept)") 
+
+
+bind_rows(model_estimates_df_full %>% mutate(model_type = "residual_based"), 
+          model_estimates_df_no_last %>% mutate(model_type = "log_diff")) %>% 
+   ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high, shape = model_type, color = is_sig)) + 
+  geom_pointrange(position = position_dodge(width = .2)) + 
+  facet_wrap(~term, scales = "free") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + 
+  coord_flip()  + 
+  ggthemes::theme_few() + 
+  theme(legend.position = "top")
+```
+

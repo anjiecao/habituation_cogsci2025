@@ -1,0 +1,834 @@
+---
+title: "Habituation re-analysis"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    toc_float: true
+---
+
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(nlme)
+library(lme4)
+library(rugarch)
+library(ggthemes)
+library(car)
+
+source("helper/volatility.R")
+source("helper/slope.R")
+```
+
+Goal: analyzing the relationship between habituation patterns and the dishabituation magnitude across three datasets. 
+
+- Adult dataset: https://onlinelibrary.wiley.com/doi/10.1111/tops.12631
+- Preschooler dataset: https://escholarship.org/uc/item/5f38t3cd 
+- Infant dataset: https://www.nature.com/articles/s41562-024-01965-x
+
+
+# 1. Dataset prepping 
+
+```{r}
+adult_d <- read_csv(here("data/raw/adult_data.csv"))
+preschooler_d <- read_csv(here("data/raw/preschooler_data.csv"))
+infant_d <- read_csv(here("data/raw/infant_data.csv"))
+```
+
+## 1.1 Prep adult dataset 
+
+Focusing on only the first block and blocks with more than two trials
+
+```{r}
+adult_habituation_data <- adult_d %>% 
+  # first block
+  filter(block_number == 1) %>% 
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # filtering out blocks with only two trials
+  filter(deviant_position != 2) %>% 
+  # create complexity note
+  mutate(complexity = if_else(block_type == "complex_dissimilar", "complex", "simple")) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, complexity, trial_looking_time) 
+
+```
+
+
+
+
+## 1.2 Prep preschooler datset 
+
+```{r}
+# figure out what blocks to retain
+retained_blocks <- preschooler_d %>% 
+  distinct(subject, block_number, trial_number, trial_type) %>% 
+  filter(trial_type == "deviant") %>% 
+  filter(trial_number > 2) %>% 
+  filter(block_number == 1) %>% 
+  mutate(deviant_trial_number = trial_number)
+
+
+preschooler_habituation_data <- preschooler_d %>% 
+  # these are participants that have the first block meeting the criteria 
+  filter(subject %in% retained_blocks$subject) %>% 
+  filter(block_number == 1) %>% 
+  left_join(retained_blocks %>% select(-trial_number, -trial_type), by = c("subject", "block_number")) %>% 
+  filter(trial_number < deviant_trial_number) %>% 
+  select(subject, trial_number, trial_looking_time, age_in_months) 
+```
+
+
+## 1.3 Prep infant dataset 
+
+```{r}
+infant_habituation_data <- infant_d %>% 
+  select(paper, subj, specific_subject_id,agedays, starts_with("train")) %>% 
+  pivot_longer(cols = starts_with("train")) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(trial_number = str_replace(name, "train", "")) %>% 
+  rename(trial_looking_time = value) %>% 
+  rename(subject = specific_subject_id, age_in_days = agedays) %>% 
+  select(paper, subject, trial_number, trial_looking_time, age_in_days) %>% 
+  mutate(trial_number = as.numeric(trial_number))
+```
+
+
+
+# 2. Measure prepping 
+
+## 2.1 Prep slope measure  
+
+
+
+
+### 2.1.1 Demo how the curve chnages shape 
+
+```{r}
+
+# Define a function for the exponential decay
+decay_model <- function(trial_number, a, b) {
+  a * exp(b * trial_number)
+}
+
+# Create a data frame with different combinations of a and b
+trial_data <- expand.grid(
+  trial_number = seq(0, 10, by = 0.1),
+  a = c(10, 20, 30),  # Different initial values
+  b = c(-0.1, -0.2, -0.3)  # Different decay rates
+)
+
+# Calculate the looking time based on the decay model
+trial_data <- trial_data %>%
+  mutate(trial_looking_time = decay_model(trial_number, a, b))
+
+# Plot the curves
+ggplot(trial_data, aes(x = trial_number, y = trial_looking_time, color = factor(a), linetype = factor(b))) +
+  geom_line(size = 1) +
+  labs(
+    title = "Effect of Parameters 'a' and 'b' on Exponential Decay Curve",
+    x = "Trial Number",
+    y = "Trial Looking Time",
+    color = "Initial Value (a)",
+    linetype = "Decay Rate (b)"
+  ) +
+  theme_minimal()
+
+```
+
+### 2.1.2 Comparison on the model performance
+
+```{r}
+
+data <- adult_habituation_data
+
+# get visualization to double check if things need to 
+# simulation with confounding variables 
+
+
+model_simple <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                     data = data,
+                     fixed = a + b ~ 1,
+                     random = b ~ 1 | subject,
+                     start = c(a = max(data$trial_looking_time), b = -0.05))
+
+model_complex <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                      data = data,
+                      fixed = a + b ~ 1,
+                      random =  a + b ~ 1 | subject,
+                      start = c(a = max(data$trial_looking_time), b = -0.05))
+
+
+model_simple_b <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                     data = data,
+                     fixed = a + b ~ 1,
+                     random = a ~ 1 | subject,
+                     start = c(a = max(data$trial_looking_time), b = -0.05))
+
+
+random_effects <- ranef(model_complex)$b
+fixed_decay_rate <- fixef(model_complex)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+random_effects <- ranef(model_simple)$b
+fixed_decay_rate <- fixef(model_simple)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+anova(model_simple, model_complex) 
+anova(model_simple_b, model_complex) # varying a
+anova(model_simple_b, model_simple) 
+
+
+anova(model_simple_b, model_simple) 
+
+
+# a+b is comparable with a 
+# a+b is worse than b
+# a and b 
+
+```
+
+
+#### 2.1.2.1 model diagosnitic?
+
+
+```{r}
+
+model_simple <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                     data = data,
+                     fixed = a + b ~ 1,
+                     random = b ~ 1 | subject,
+                     start = c(a = max(data$trial_looking_time), b = -0.05))
+
+data$simple_model_predict <- predict(model_simple)
+
+
+# Select a random subset of subjects
+set.seed(123) # For reproducibility
+subset_subjects <- sample(unique(data$subject), 12) # Change 6 to the number of participants you want to plot
+
+# Filter data for the selected subset
+subset_data <- data %>% filter(subject %in% subset_subjects)
+
+
+ggplot(subset_data, aes(x = trial_number)) +
+  geom_point(aes(y = trial_looking_time), color = 'blue') +  # Actual data
+  geom_line(aes(y = simple_model_predict), color = 'red', linetype = "dashed") +  # Model predictions
+  labs(x = "Trial Number", y = "Looking Time", title = "Simple Model Fitting: Actual vs Predicted") +
+  theme_minimal() + 
+  facet_wrap(~subject)
+```
+
+
+
+```{r}
+model_complex <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                      data = data,
+                      fixed = a + b ~ 1,
+                      random =  a + b ~ 1 | subject,
+                      start = c(a = max(data$trial_looking_time), b = -0.05))
+
+data$complex_model_predict <- predict(model_complex)
+
+# Select a random subset of subjects
+set.seed(123) # For reproducibility
+subset_subjects <- sample(unique(data$subject), 12) # Change 6 to the number of participants you want to plot
+# Filter data for the selected subset
+subset_data <- data %>% filter(subject %in% subset_subjects)
+
+ggplot(subset_data, aes(x = trial_number)) +
+  geom_point(aes(y = trial_looking_time), color = 'blue') +  # Actual data
+  geom_line(aes(y = complex_model_predict), color = 'red', linetype = "dashed") +  # Model predictions
+  labs(x = "Trial Number", y = "Looking Time", title = "Complex Model Fitting: Actual vs Predicted") +
+  theme_minimal() + 
+  facet_wrap(~subject)
+
+```
+
+```{r}
+model_simple_b <- nlme(trial_looking_time ~ a * exp(b * trial_number),
+                     data = data,
+                     fixed = a + b ~ 1,
+                     random = a ~ 1 | subject,
+                     start = c(a = max(data$trial_looking_time), b = -0.05))
+
+data$model_simple_b_predict <- predict(model_simple_b)
+
+# Select a random subset of subjects
+set.seed(123) # For reproducibility
+subset_subjects <- sample(unique(data$subject), 12) # Change 6 to the number of participants you want to plot
+# Filter data for the selected subset
+subset_data <- data %>% filter(subject %in% subset_subjects)
+
+ggplot(subset_data, aes(x = trial_number)) +
+  geom_point(aes(y = trial_looking_time), color = 'blue') +  # Actual data
+  geom_line(aes(y = model_simple_b_predict), color = 'red', linetype = "dashed") +  # Model predictions
+  labs(x = "Trial Number", y = "Looking Time", title = "Simple Model B Fitting: Actual vs Predicted") +
+  theme_minimal() + 
+  facet_wrap(~subject)
+```
+
+
+
+
+### 2.1.4 Fitting the models to all the datasets
+
+```{r}
+adult_slope_df <- get_individual_slope(adult_habituation_data)
+preschooler_slope_df <- get_individual_slope(preschooler_habituation_data)
+infant_slope_df <- get_individual_slope(infant_habituation_data)
+```
+
+
+## 2.2 Prep volatility measure 
+
+
+### 2.2.1  Fit with each dataset
+
+```{r}
+adult_volatility_measure <- get_volatility_measures(adult_habituation_data)
+preschooler_volatility_measure <-  get_volatility_measures(preschooler_habituation_data)
+infant_volatility_measure <-  get_volatility_measures(infant_habituation_data)
+```
+
+## 2.3 Put together all the measures 
+
+```{r}
+adult_measures <- adult_volatility_measure %>% 
+  left_join(adult_slope_df, by = c("subject"))
+
+preschooler_measures <- preschooler_volatility_measure %>% 
+  left_join(preschooler_slope_df, by = c("subject"))
+
+infant_measures <- infant_volatility_measure %>% 
+  left_join(infant_slope_df, by = c("subject"))
+```
+
+
+# 3. Dishabituation and measure dataset prepping 
+
+## 3.1 Adult 
+
+### 3.1.1 get difference 
+
+```{r}
+adult_full_raw <- adult_d %>% 
+  filter(block_number == 1) %>% 
+  mutate(complexity = if_else(block_type == "complex_dissimilar", "complex", "simple"))
+
+adult_dishab_raw <- adult_full_raw %>% 
+  filter(block_number == 1) %>% 
+  filter(trial_number == deviant_position) %>% 
+  filter(deviant_position != 2) 
+
+adult_dishab_d <- adult_full_raw %>% 
+  select(subject, trial_looking_time, complexity) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    adult_full_raw %>%  select(-complexity) %>% filter(trial_number < deviant_position) %>% group_by(subject) %>% filter(trial_number == max(trial_number)),
+    by = c("subject")
+  ) %>% 
+  # calculating the key 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num, complexity)
+
+```
+
+
+
+### 3.1.2 link age 
+
+
+```{r}
+raw_adult <- read_csv(here("data/raw/adult_raw_with_prolific.csv"))
+prolific_d <- read_csv(here("data/raw/adult_prolific.csv"))
+
+subject_prolific_link <- raw_adult %>% 
+  filter(grepl("p_id", responses)) %>% 
+  mutate(prolific_id = str_extract(responses, '(?<="p_id":")[^"]+')) %>% 
+  select(subject, prolific_id)
+
+link_df <- prolific_d %>% 
+  rename(prolific_id = participant_id) %>% 
+  select(prolific_id, age) %>% 
+  left_join(subject_prolific_link, by = c("prolific_id"))
+
+adult_dishab_d <- adult_dishab_d %>% 
+  left_join(link_df %>% select(-prolific_id), by = c("subject")) 
+```
+
+
+### 3.1.3 combine with the measures 
+
+```{r}
+adult_measures_with_dishab <- adult_dishab_d %>% 
+  left_join(adult_measures, by = c("subject"))
+```
+
+
+## 3.2 Preschooler 
+
+### 3.2.1 Put together 
+
+```{r}
+
+preschooler_full_raw <- preschooler_d %>% 
+  filter(block_number == 1)
+
+preschooler_dishab_d <- preschooler_full_raw %>% 
+  filter(subject %in% retained_blocks$subject) %>% 
+  filter(block_number == 1) %>% 
+  left_join(retained_blocks %>% select(-trial_number, -trial_type), by = c("subject", "block_number")) %>% 
+  filter(trial_number == deviant_trial_number) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    preschooler_full_raw %>% group_by(subject) %>%  filter(subject %in% retained_blocks$subject) %>% 
+  filter(block_number == 1) %>% 
+  left_join(retained_blocks %>% select(-trial_number, -trial_type), by = c("subject", "block_number")) %>% 
+  filter(trial_number < deviant_trial_number) %>%
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+    ungroup() %>% 
+  select(subject,  trial_looking_time), 
+    by = c("subject")
+  ) %>% 
+  # Calculate the difference 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num, age_in_months)
+  
+preschooler_measures_with_dishab <- preschooler_dishab_d %>% 
+  left_join(preschooler_measures, by = c("subject"))
+```
+
+
+## 3.3 Infants 
+
+### 3.1.1 Re-wrangle some datasets 
+
+```{r}
+# try to construct the dataset to mimic the other ones, using only first of the unexpected as the "dishabituating trials"
+# figure out the trial number for the extra trial
+last_trial_number <- infant_d %>% 
+  rename(subject = specific_subject_id) %>% 
+  select(subject, agedays, starts_with("train"), "expected1") %>% 
+  rename(trainEXTRA = expected1) %>% 
+  pivot_longer(cols = starts_with("train")) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(trial_number = as.numeric(str_replace(name, "train", ""))) %>% 
+ group_by(subject) %>% 
+  summarise(max_trial = max(trial_number, na.rm = TRUE)) %>% 
+  mutate(last_trial = max_trial + 1) %>% 
+  select(subject,last_trial) %>% 
+  ungroup() %>% 
+  filter(!last_trial == -Inf)
+
+```
+
+
+```{r}
+
+infant_model_d <- infant_d %>% 
+  mutate(complexity = if_else(domain == "psychology", "complex", "simple")) %>% 
+  rename(subject = specific_subject_id) %>% 
+  select(subject, agedays, complexity, starts_with("train"), "expected1") %>% 
+  rename(trainEXTRA = expected1) %>% 
+  pivot_longer(cols = starts_with("train")) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(trial_number = as.numeric(str_replace(name, "train", ""))) %>% 
+  left_join(last_trial_number, by = c("subject")) %>% 
+  mutate(trial_type = case_when(
+    is.na(trial_number) ~ "deviant", 
+    TRUE ~ "background"
+  )) %>% 
+  mutate(trial_number = case_when(
+    is.na(trial_number) ~ last_trial, 
+    TRUE ~ trial_number
+  )) %>% 
+  filter(!is.na(trial_number)) %>% 
+  select(subject, trial_number, trial_type, value, agedays, complexity) %>% 
+  rename(trial_looking_time = value)
+
+```
+
+
+
+
+### 3.1.3  Put things together 
+
+```{r}
+duplicate_subjects <- infant_model_d %>% group_by(subject) %>% filter(trial_type != "deviant") %>%  filter(trial_number == max(trial_number)) %>% select(subject, trial_number, trial_looking_time, agedays) %>% group_by(subject) %>% count() %>% filter(n > 1)
+```
+
+
+```{r}
+infant_dishab_d <- infant_model_d %>% 
+  filter(trial_type == "deviant") %>% 
+  filter(!subject %in% duplicate_subjects$subject) %>% 
+  select(subject, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    infant_model_d %>% group_by(subject) %>% filter(trial_type != "deviant") %>%  filter(trial_number == max(trial_number)) %>% select(subject, trial_number, trial_looking_time, agedays, complexity) %>% filter(!subject %in% duplicate_subjects$subject), 
+    by = c("subject")
+  ) %>% 
+  # calculate the difference 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+   mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num, agedays,complexity)
+
+```
+
+
+```{r}
+infant_measure_with_dishab <- infant_dishab_d %>% 
+  select(subject, dishab_trial_num, dishab_diff, agedays, complexity) %>% 
+  left_join(infant_measures, by = c("subject"))
+
+```
+
+
+# 4. Visualization 
+
+## 4.1. Raw habituation data Visualizatino 
+
+### 4.1.1 Adults
+
+```{r}
+adult_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) 
+ 
+
+adult_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) +
+  scale_y_log10()
+
+adult_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") 
+ 
+
+adult_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") +
+  scale_y_log10()
+```
+
+
+
+### 4.1.2 Preschoolers
+
+```{r}
+preschooler_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) 
+ 
+
+preschooler_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) +
+  scale_y_log10()
+
+preschooler_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") 
+ 
+
+preschooler_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") +
+  scale_y_log10()
+```
+
+
+
+### 4.1.3 Infants
+
+```{r}
+infant_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject)) + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) 
+ 
+
+infant_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = subject))  + 
+  geom_point(alpha = .1) + 
+  geom_line(alpha = .1) +
+  scale_y_log10()
+
+infant_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") 
+ 
+
+infant_habituation_data %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(alpha = .1) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "red") +
+  scale_y_log10()
+```
+
+
+
+# 4.2 Raw dishabituation data visualization 
+
+```{r}
+adult_measures_with_dishab %>% 
+  ggplot(aes(x = dishab_diff)) + 
+  geom_density(alpha = .1, aes(fill = as.factor(dishab_trial_num)))
+```
+
+```{r}
+preschooler_measures_with_dishab %>% 
+  ggplot(aes(x = dishab_diff)) + 
+  geom_density(alpha = .1, aes(fill = as.factor(dishab_trial_num)))
+```
+
+```{r}
+infant_measure_with_dishab %>% 
+  ggplot(aes(x = dishab_diff)) + 
+  geom_density()
+```
+
+
+
+
+# 4.3 Measure and data predictions 
+
+
+```{r}
+full_d <- bind_rows(
+  infant_measure_with_dishab %>% mutate(group = "infants"), 
+  preschooler_measures_with_dishab %>% mutate(group = "preschoolers"), 
+  adult_measures_with_dishab %>% mutate(group = "adults")
+)
+```
+
+### 4.3.1 Slope measures vs resid across age groups 
+
+```{r}
+full_d %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point(alpha = .2) + 
+  facet_wrap(~group, scales = "free") + 
+  geom_smooth(method = "lm") 
+
+
+full_d %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point(alpha = .2) + 
+  facet_grid(complexity~group, scales = "free") + 
+  geom_smooth(method = "lm") 
+
+# log would remove the negative ones 
+full_d %>% 
+  ggplot(aes(x = decay_rate, y = log(dishab_diff))) + 
+  geom_point(alpha = .2) + 
+  facet_wrap(~group, scales = "free") + 
+  geom_smooth(method = "lm") 
+```
+
+## 4.3.2 Volatility measurs across age groups 
+
+
+
+```{r fig.width=8, fig.height=8}
+full_d %>% 
+  pivot_longer(cols = ends_with("volatility"), names_to = "volatility_type", values_to =  "volatility_measure") %>% 
+  ggplot(aes(x = volatility_measure, y = dishab_diff)) + 
+  geom_point(alpha = .2) + 
+  facet_wrap(volatility_type~group, scales = "free") + 
+  geom_smooth(method = "lm") 
+```
+
+
+# 5. Models 
+
+## 5.1 Adults 
+
+### 5.1.2 Decay Rate only 
+
+```{r}
+lm(dishab_diff ~ decay_rate, data = adult_measures_with_dishab) %>% summary()
+
+
+lm(dishab_diff ~ complexity, data = adult_measures_with_dishab) %>% summary()
+
+```
+
+
+### 5.1.3 Decay Rate + Age 
+
+```{r}
+lm(dishab_diff ~ decay_rate + age, data = adult_measures_with_dishab) %>% summary()
+```
+
+
+
+
+### 5.1.3 Decay Rate + Age + volatility measure
+
+```{r}
+lm(dishab_diff ~ decay_rate + age + sd_volatility, data = adult_measures_with_dishab) %>% summary()
+```
+
+## 5.2 Preschoolers 
+
+### 5.1.2 Decay Rate only 
+
+```{r}
+lm(dishab_diff ~ decay_rate , data = preschooler_measures_with_dishab) %>% summary()
+```
+
+
+
+### 5.1.3 Decay Rate + Age 
+
+```{r}
+lm(dishab_diff ~ decay_rate + age_in_months, data = preschooler_measures_with_dishab) %>% summary()
+```
+
+
+
+### 5.1.3 Decay Rate + Age + volatility measure
+
+```{r}
+lm(dishab_diff ~ decay_rate + age_in_months + sd_volatility, data = preschooler_measures_with_dishab) %>% summary()
+```
+
+
+```{r}
+vif(lm(dishab_diff ~ decay_rate + age_in_months + sd_volatility, data = preschooler_measures_with_dishab))
+```
+
+
+## 6.1 Infants 
+
+### 6.1.1 Decay Rate only 
+
+```{r}
+lm(dishab_diff ~ decay_rate , data = infant_measure_with_dishab) %>% summary()
+```
+
+
+### 5.1.3 Decay Rate + Age 
+
+```{r}
+lm(dishab_diff ~ decay_rate + agedays, data = infant_measure_with_dishab) %>% summary()
+```
+
+### 5.1.3 Decay Rate + Age + volatility measure
+
+```{r}
+lm(dishab_diff ~ decay_rate + agedays + sd_volatility, data = infant_measure_with_dishab) %>% summary()
+```
+
+
+
+# 6. Summarizing Model results
+
+## 6.1 Combine Decay Rate Only models
+
+```{r}
+
+bind_rows(
+  lm(dishab_diff ~ decay_rate, data = adult_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "adults"),
+  lm(dishab_diff ~ decay_rate, data = preschooler_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "preschoolers"),
+  lm(dishab_diff ~ decay_rate, data = infant_measure_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "infants")
+) %>% 
+  filter(term == "decay_rate") %>% 
+  ggplot(aes(x = factor(group, levels = c("infants", "preschoolers", "adults")), y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() + 
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed") + 
+  coord_flip() + 
+  theme_few() + 
+  xlab("")
+
+
+```
+
+
+## 6.2 Combine Decay Rate + Age Models
+
+```{r}
+bind_rows(
+   lm(dishab_diff ~ decay_rate + age, data = adult_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "adults"),
+  lm(dishab_diff ~ decay_rate + age_in_months, data = preschooler_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "preschoolers"),
+  lm(dishab_diff ~ decay_rate + agedays, data = infant_measure_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "infants")
+) %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(clean_term = case_when(
+    term == "age_in_months" ~ "age",
+    term == "agedays" ~ "age", 
+    TRUE ~ term
+)) %>% 
+  ggplot(aes(x = factor(group, levels = c("infants", "preschoolers", "adults")), y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() + 
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed") + 
+  coord_flip() + 
+  theme_few() + 
+  xlab("") + 
+  facet_wrap(~clean_term)
+```
+
+
+
+## 6.3 Combine Decay Rate + Age + Volatility Models
+
+```{r}
+bind_rows(
+   lm(dishab_diff ~ decay_rate + age + sd_volatility, data = adult_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "adults"),
+  lm(dishab_diff ~ decay_rate + age_in_months + sd_volatility, data = preschooler_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "preschoolers"),
+  lm(dishab_diff ~ decay_rate + agedays + sd_volatility, data = infant_measure_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "infants")
+) %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(clean_term = case_when(
+    term == "age_in_months" ~ "age",
+    term == "agedays" ~ "age", 
+    TRUE ~ term
+)) %>% 
+  ggplot(aes(x = factor(group, levels = c("infants", "preschoolers", "adults")), y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() + 
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed") + 
+  coord_flip() + 
+  theme_few() + 
+  xlab("") + 
+  facet_wrap(~clean_term, scales = "free")
+```
+
+```{r}
+bind_rows(
+   lm(dishab_diff ~ decay_rates_random + age + sd_volatility, data = adult_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "adults"),
+  lm(dishab_diff ~ decay_rates_random + age_in_months + sd_volatility, data = preschooler_measures_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "preschoolers"),
+  lm(dishab_diff ~ decay_rates_random + agedays + sd_volatility, data = infant_measure_with_dishab) %>% broom::tidy(conf.int = TRUE, conf.level = 0.95) %>% mutate(group = "infants")
+) %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(clean_term = case_when(
+    term == "age_in_months" ~ "age",
+    term == "agedays" ~ "age", 
+    TRUE ~ term
+)) %>% 
+  ggplot(aes(x = factor(group, levels = c("infants", "preschoolers", "adults")), y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  geom_pointrange() + 
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed") + 
+  coord_flip() + 
+  theme_few() + 
+  xlab("") + 
+  facet_wrap(~clean_term, scales = "free")
+```
+
+

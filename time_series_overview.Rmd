@@ -1,0 +1,902 @@
+
+
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(lme4)
+library(nlme)
+
+# load simulation data 
+sim_dr <- read_csv(here("data/simulations/sim_dr.csv"))
+sim_ft <- read_csv(here("data/simulations/sim_ft.csv"))
+sim_nr <- read_csv(here("data/simulations/sim_nr.csv"))
+
+# load real data
+adult_hab_full <- read_csv(here("data/raw/adult_hab_full.csv"))
+adult_hab_no_last <- read_csv(here("data/raw/adult_hab_no_last.csv"))
+adult_dishab <- read_csv(here("data/raw/adult_dishab.csv"))
+
+preschooler_hab_full <- read_csv(here("data/raw/preschooler_hab_full.csv"))
+preschooler_hab_no_last <- read_csv(here("data/raw/preschooler_hab_no_last.csv"))
+preschooler_dishab <- read_csv(here("data/raw/preschooler_dishab.csv"))
+
+infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv"))
+infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv"))
+infant_dishab <- read_csv(here("data/raw/infant_dishab.csv"))
+
+# helper function 
+source(here("helper/slope.R"))
+source(here("helper/resid.R"))
+```
+
+
+
+# 0. Preprocessing 
+
+## 0.1. DR
+
+```{r}
+sim_dr_hab <-  sim_dr %>% 
+  filter(trial_number < deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_dr_hab_no_last <-  sim_dr %>% 
+  filter(trial_number < deviant_position - 1) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_dr_dev <-  sim_dr %>% 
+  filter(trial_number == deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+```
+
+## 0.2 FT 
+
+```{r}
+sim_ft_hab <-  sim_ft %>% 
+  filter(trial_number < deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_ft_hab_no_last <-  sim_ft %>% 
+  filter(trial_number < deviant_position - 1) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_ft_dev <-  sim_ft %>% 
+  filter(trial_number == deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+```
+
+## 0.3 NR 
+
+```{r}
+sim_nr_hab <-  sim_nr %>% 
+  filter(trial_number < deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_nr_hab_no_last <-  sim_nr %>% 
+  filter(trial_number < deviant_position - 1) %>% 
+  select(subject, trial_number, trial_looking_time) 
+
+sim_nr_dev <-  sim_nr %>% 
+  filter(trial_number == deviant_position) %>% 
+  select(subject, trial_number, trial_looking_time) 
+```
+
+
+# 1. Slope INCLUDE last hab trial - Resid Deviant Models 
+
+## 1.1 Simulations 
+
+### 1.1.1 NR
+
+```{r}
+
+## get slope 
+sim_nr_slope <- get_individual_slope(sim_nr_hab)
+
+## get residual 
+
+sim_nr_hab_resid <- get_hab_residual(sim_nr_hab)
+#sim_nr_dev_resid <- get_dev_residual(sim_nr_dev)
+
+sim_nr_slope %>% 
+  left_join(sim_nr_dev_resid, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+```
+
+
+### 1.1.2 FT
+
+```{r}
+## get slope 
+sim_ft_slope <- get_individual_slope(sim_ft_hab)
+
+## get residual 
+
+sim_ft_hab_resid <- get_hab_residual(sim_ft_hab)
+#sim_ft_dev_resid <- get_dev_residual(sim_ft_dev)
+
+sim_ft_slope %>% 
+  left_join(sim_ft_dev_resid, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+### 1.1.3 DR
+
+```{r}
+## get slope 
+#sim_dr_slope <- get_individual_slope(sim_dr_hab)
+
+## get residual 
+
+#sim_dr_hab_resid <- get_hab_residual(sim_dr_hab)
+#sim_dr_dev_resid <- get_dev_residual(sim_dr_dev)
+
+sim_dr_slope %>% 
+  left_join(sim_dr_dev_resid, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+# 1.2 Real Data
+
+
+```{r}
+
+hab_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)  
+dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)  
+
+# Get slopes for all hab datasets
+slopes <- map(hab_datasets, get_individual_slope)
+
+# Get hab residuals for all hab datasets
+hab_residuals <- map(hab_datasets, get_hab_residual)
+
+# Get dev residuals for all dev datasets
+dev_residuals <- map(dev_datasets, get_dev_residual)
+
+# Left join for each pair of datasets 
+joined_results <- map2(slopes, dev_residuals, ~ left_join(.x, .y, by = "subject"))
+
+bind_rows(
+  joined_results[[1]] %>% mutate(group = "1_adult"), 
+  joined_results[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = resid_dev)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+```
+
+# 2. Slope INCLUDE last hab trial - (Resid Deviant - Resid Last Trial) 
+
+## 2.1 Simulations 
+
+### 2.1.1 NR
+
+```{r}
+
+# get slope 
+sim_nr_slope <- get_individual_slope(sim_nr_hab)
+
+# get residual 
+sim_nr_hab_resid <- get_hab_residual(sim_nr_hab)
+sim_nr_dev_resid <- get_dev_residual(sim_nr_dev)
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_nr_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_nr_dev_resid %>% select(subject, resid_dev), 
+    by = c("subject")
+  ) %>% 
+  mutate(resid_diff = resid_dev - last_hab_resid)
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_nr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+```
+
+
+### 2.1.2 FT
+
+```{r}
+## get slope 
+sim_ft_slope <- get_individual_slope(sim_ft_hab)
+
+## get residual 
+sim_ft_hab_resid <- get_hab_residual(sim_ft_hab)
+sim_ft_dev_resid <- get_dev_residual(sim_ft_dev)
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_ft_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_ft_dev_resid %>% select(subject, resid_dev), 
+    by = c("subject")
+  ) %>% 
+  mutate(resid_diff = resid_dev - last_hab_resid)
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_ft_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+### 2.1.3 DR
+
+```{r}
+## get slope 
+sim_dr_slope <- get_individual_slope(sim_dr_hab)
+
+## get residual 
+sim_dr_hab_resid <- get_hab_residual(sim_dr_hab)
+sim_dr_dev_resid <- get_dev_residual(sim_dr_dev)
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_dr_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_dr_dev_resid %>% select(subject, resid_dev), 
+    by = c("subject")
+  ) %>% 
+  mutate(resid_diff = resid_dev - last_hab_resid)
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_dr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = resid_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+## 2.2 Real Data 
+
+```{r}
+calculate_resid_diff <- function(hab_resid, dev_resid){
+  
+  resid_diff <- hab_resid %>% ha
+    group_by(subject) %>% 
+    filter(trial_number == max(trial_number)) %>% 
+    rename(last_hab_resid = resid_hab) %>% 
+   select(subject, last_hab_resid) %>% 
+    left_join(
+    dev_resid %>% select(subject, resid_dev), 
+    by = c("subject")
+  ) %>% 
+  mutate(resid_diff = resid_dev - last_hab_resid)
+  
+  return(resid_diff)
+}
+
+# calculate the residual difference 
+resid_diffs <- map2(hab_residuals, dev_residuals, calculate_resid_diff)
+
+# join the datasets 
+joined_results <- map2(slopes, resid_diffs, ~ left_join(.x, .y, by = "subject"))
+
+# visualize 
+bind_rows(
+  joined_results[[1]] %>% mutate(group = "1_adult"), 
+  joined_results[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = resid_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+
+```
+
+
+# 3. Slope BEFORE last habituation trial - (Raw Dev - Raw Last)
+
+## 3.1 Simulations 
+
+### 3.1.1 NR
+
+```{r}
+# get slope 
+sim_nr_slope <- get_individual_slope(sim_nr_hab_no_last)
+
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_nr %>% 
+  filter(trial_type != "deviant") %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_looking_time = trial_looking_time) %>% 
+  select(subject, last_hab_looking_time) %>% 
+  left_join(
+    sim_nr %>% filter(trial_type == "deviant") %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_dev_diff = dev_looking_time - last_hab_looking_time, 
+    log_hab_dev_diff = log(dev_looking_time)- log(last_hab_looking_time))
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_nr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+hab_dev_diff %>% 
+  left_join(sim_nr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = log_hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+```
+
+### 3.1.2 FT
+
+```{r}
+# get slope 
+sim_ft_slope <- get_individual_slope(sim_ft_hab_no_last)
+
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_ft %>% 
+  filter(trial_type != "deviant") %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_looking_time = trial_looking_time) %>% 
+  select(subject, last_hab_looking_time) %>% 
+  left_join(
+    sim_ft %>% filter(trial_type == "deviant") %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_dev_diff = dev_looking_time - last_hab_looking_time, 
+    log_hab_dev_diff = log(dev_looking_time)- log(last_hab_looking_time))
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_ft_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+hab_dev_diff %>% 
+  left_join(sim_ft_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = log_hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+### 3.1.3 DR
+
+```{r}
+# get slope 
+sim_dr_slope <- get_individual_slope(sim_dr_hab_no_last)
+
+
+# calculate the diff between the last trial and the deviant
+hab_dev_diff <- sim_dr %>% 
+  filter(trial_type != "deviant") %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_looking_time = trial_looking_time) %>% 
+  select(subject, last_hab_looking_time) %>% 
+  left_join(
+    sim_dr %>% filter(trial_type == "deviant") %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_dev_diff = dev_looking_time - last_hab_looking_time, 
+    log_hab_dev_diff = log(dev_looking_time)- log(last_hab_looking_time))
+
+
+
+hab_dev_diff %>% 
+  left_join(sim_dr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+hab_dev_diff %>% 
+  left_join(sim_dr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = log_hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+
+## 3.2 Real Data 
+
+```{r}
+
+get_diff_raw_looking_time <- function(hab_data, dev_data){
+  # calculate the diff between the last trial and the deviant
+  hab_dev_diff <- hab_data %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_looking_time = trial_looking_time) %>% 
+  select(subject, last_hab_looking_time) %>% 
+  left_join(
+    dev_data  %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_dev_diff = dev_looking_time - last_hab_looking_time, 
+    log_hab_dev_diff = log(dev_looking_time)- log(last_hab_looking_time))
+  
+  return(hab_dev_diff)
+}
+
+
+hab_no_last_datasets <- list(adult_hab_no_last, preschooler_hab_no_last, infant_hab_no_last)  
+hab_full_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)
+dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)
+
+# Get slopes for all hab datasets
+slopes <- map(hab_no_last_datasets, get_individual_slope)
+diff_raw <- map2(hab_full_datasets, dev_datasets, get_diff_raw_looking_time)
+
+
+# Left join for each pair of datasets 
+joined_results <- map2(slopes, diff_raw, ~ left_join(.x, .y, by = "subject"))
+
+bind_rows(
+  joined_results[[1]] %>% mutate(group = "1_adult"), 
+  joined_results[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+
+bind_rows(
+  joined_results[[1]] %>% mutate(group = "1_adult"), 
+  joined_results[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = log_hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+```
+
+# 4. slope INCLUDE last hab trial - RAW deviant - Residual last trial 
+
+
+## 4.1 Simulations 
+
+### 4.1.1 NR 
+
+```{r}
+# get slope 
+sim_nr_slope <- get_individual_slope(sim_nr_hab)
+
+# get residual 
+sim_nr_hab_resid <- get_hab_residual(sim_nr_hab)
+
+hab_dev_diff <- sim_nr_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_nr_dev %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_resid_dev_diff = dev_looking_time - last_hab_resid)
+
+hab_dev_diff %>% 
+  left_join(sim_nr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_resid_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+
+```
+
+### 4.1.2 FT
+
+```{r}
+# get slope 
+sim_ft_slope <- get_individual_slope(sim_ft_hab)
+
+# get residual 
+sim_ft_hab_resid <- get_hab_residual(sim_ft_hab)
+
+hab_dev_diff <- sim_ft_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_ft_dev %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_resid_dev_diff = dev_looking_time - last_hab_resid)
+
+hab_dev_diff %>% 
+  left_join(sim_ft_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_resid_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+```
+
+### 4.1.3 DR 
+
+```{r}
+# get slope 
+sim_dr_slope <- get_individual_slope(sim_dr_hab)
+
+# get residual 
+sim_dr_hab_resid <- get_hab_residual(sim_dr_hab)
+
+hab_dev_diff <- sim_ft_hab_resid %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    sim_dr_dev %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_resid_dev_diff = dev_looking_time - last_hab_resid)
+
+hab_dev_diff %>% 
+  left_join(sim_dr_slope, by = c("subject")) %>% 
+  ggplot(aes(x = decay_rate, y = hab_resid_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+## 4.2 Real Data
+
+```{r}
+hab_full_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)
+dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)
+
+get_diff_resid_looking_time <- function(hab_resid_data, dev_data){
+  # calculate the diff between the last trial and the deviant
+  hab_dev_diff <- hab_resid_data %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number)) %>% 
+  rename(last_hab_resid = resid_hab) %>% 
+  select(subject, last_hab_resid) %>% 
+  left_join(
+    dev_data  %>% 
+    rename(dev_looking_time = trial_looking_time) %>% 
+    select(subject, dev_looking_time), 
+    by = c("subject")
+  ) %>% 
+  mutate(
+    hab_dev_diff = dev_looking_time - last_hab_resid)
+  
+  return(hab_dev_diff)
+}
+
+
+# Get slopes for all hab datasets
+slopes <- map(hab_full_datasets, get_individual_slope)
+
+# Get residuals for all datasets 
+hab_residuals <- map(hab_full_datasets, get_hab_residual)
+
+#calculate the difference 
+diff_resid_lt <- map2(hab_residuals, dev_datasets, get_diff_resid_looking_time)
+
+#join the dataset 
+joined_results <- map2(slopes, diff_resid_lt, ~ left_join(.x, .y, by = "subject"))
+
+#visualization 
+# visualize 
+bind_rows(
+  joined_results[[1]] %>% mutate(group = "1_adult"), 
+  joined_results[[2]] %>% mutate(group = "2_preschooler"),
+  joined_results[[3]] %>% mutate(group = "3_infant"),
+) %>% 
+  ggplot(aes(x = decay_rate, y = hab_dev_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(~group, scales = "free")
+
+```
+
+
+# 5. Checking 
+
+```{r}
+
+#https://www.statforbiology.com/2019/stat_nlmm_designconstraints/
+
+sim_ft_hab$subject <- as.factor(sim_ft_hab$subject)
+
+mixed_exp_model <- nlme(
+    trial_looking_time ~ a * exp(b * trial_number),  # Simplified exponential decay model
+    data = sim_ft_hab,
+    fixed = a + b ~ 1,                # Fixed effects for a and b
+    random = list(subject = pdDiag(a + b ~ 1)),       # Random effect for b (decay rate) by subject
+    
+    start = c(a = max(sim_ft_hab$trial_looking_time), 
+              b = -0.05)  # Starting values
+  )
+
+
+
+ mixed_exp_model <- nlme(
+    trial_looking_time ~ a * exp(b * trial_number),  # Simplified exponential decay model
+    data = infant_hab_no_last,
+    fixed = a + b ~ 1,                # Fixed effects for a and b
+     random = list(subject = pdDiag(a + b ~ 1)),         # Random effect for b (decay rate) by subject
+    start = c(a = max(infant_hab_no_last$trial_looking_time), 
+              b = -0.05)  # Starting values
+  )
+
+
+fixef(mixed_exp_model)
+
+coefficients(mixed_exp_model)
+
+VarCorr(mixed_exp_model)
+
+
+
+as.data.frame(coefficients(mixed_exp_model)) %>% 
+  ggplot(aes(x = a, y = b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  labs(title = "a and b")
+
+  
+cor(coefficients(mixed_exp_model)$a, coefficients(mixed_exp_model)$b)
+
+sim_ft_hab %>% 
+  filter(trial_number == 1) %>% 
+  mutate(
+    b_val = ranef(mixed_exp_model)$b
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = b_val)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(title = "first trial and b")
+
+sim_ft_hab %>% 
+  filter(trial_number == 1) %>% 
+  mutate(
+    a_val = ranef(mixed_exp_model)$a
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = a_val)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")+
+  labs(title = "first trial and a")
+
+
+```
+
+
+```{r}
+data_summary <- sim_ft_hab %>%
+  group_by(subject) %>%
+  summarize(
+    a = max(trial_looking_time),
+    b = lm(log(trial_looking_time) ~ trial_number)$coefficients[2]
+  )
+
+
+data_summary %>% 
+  ggplot(aes(x = a, y = b)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+```
+
+
+```{r}
+
+library(dplyr)
+
+n_subjects  <- 50
+n_trials    <- 20
+a_range     <- c(5000, 7000)  # narrower range for 'a'
+b_range     <- c(-0.08, -0.03) # narrower range for 'b' (decay rate)
+residual_sd <- 150             # moderate residual noise
+
+sim_data <- lapply(seq_len(n_subjects), function(i) {
+  # Draw subject-specific true parameters:
+  a_i <- runif(1, a_range[1], a_range[2])
+  b_i <- runif(1, b_range[1], b_range[2])
+
+  # Generate times
+  trial_number <- seq_len(n_trials)
+
+  # True expected looking time
+  true_looking <- a_i * exp(b_i * trial_number)
+
+  # Add some random noise
+  observed_looking <- true_looking + rnorm(n_trials, mean = 0, sd = residual_sd)
+
+  # Enforce a minimum > 0 (sometimes large negative residual can produce small or negative values)
+  observed_looking <- pmax(observed_looking, 10)
+
+  # Return a data frame for this subject
+  data.frame(
+    subject      = factor(i),
+    trial_number = trial_number,
+    looking_time = observed_looking,
+    true_a       = a_i,
+    true_b       = b_i
+  )
+}) %>%
+  bind_rows()
+
+start_vals <- c(a = mean(a_range), b = mean(b_range))
+
+fit_nlme <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data   = adult_hab_no_last,
+  fixed  = a + b ~ 1,
+  random = list(subject = pdDiag(a + b ~ 1)),  # random effect only on b
+  start  = start_vals,
+  control = nlmeControl(
+    pnlsMaxIter = 50,
+    msMaxIter   = 200,
+    tolerance   = 1e-6,
+    opt         = "nlminb"
+  )
+)
+
+fixed_effects <- fixef(fit_nlme)
+
+fitted_random_effects <- ranef(fit_nlme) %>% 
+  rownames_to_column("subject") %>% 
+  mutate(a = a + fixed_effects['a'], 
+         b = b + fixed_effects['b'])
+
+
+
+comparison <- left_join(fitted_random_effects, 
+                        adult_hab_no_last %>%
+                          group_by(subject) %>%
+                          summarize(true_a = first(true_a), true_b = first(true_b)),
+                                                                                               by = "subject")
+
+# Plot for 'a'
+ggplot(comparison, aes(x = true_a, y = a)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  geom_smooth(method = "lm") + 
+  labs(title = "True vs Fitted Random Effects for a",
+       x = "True Random Effect (a)", y = "Fitted Random Effect (a)")
+
+ggplot(comparison, aes(x = true_a, y = true_b)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  labs(title = "True A vs True B",
+       x = "True Random Effect (a)", y = "True Random Effect (b)")
+
+# Plot for 'b'
+ggplot(comparison, aes(x = true_b, y = b)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  geom_smooth(method = "lm") + 
+  labs(title = "True vs Fitted Random Effects for b",
+       x = "True Random Effect (b)", y = "Fitted Random Effect (b)")
+
+
+ggplot(fitted_random_effects, aes(x = a, y = b)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Random Effects for a vs b",
+       x = "Random Effect for a", y = "Random Effect for b")
+
+summary(simulated_data)
+
+```
+
+
+```{r}
+library(brms)
+set.seed(123)
+n_subjects <- 30
+n_trials <- 15
+
+# Ranges for 'a' and 'b'
+a_range <- c(5000, 10000)
+b_range <- c(-0.1, -0.01)
+residual_sd <- 50
+
+simulated_data <- do.call(rbind, lapply(seq_len(n_subjects), function(i) {
+  a_true <- runif(1, a_range[1], a_range[2])
+  b_true <- runif(1, b_range[1], b_range[2])
+  trial_number <- 1:n_trials
+  trial_looking_time <- a_true * exp(b_true * trial_number) + 
+    rnorm(n_trials, 0, residual_sd)
+  data.frame(
+    subject = factor(paste0("S", sprintf("%03d", i))),
+    trial_number = trial_number,
+    trial_looking_time = trial_looking_time,
+    true_a = a_true,
+    true_b = b_true
+  )
+}))
+
+nl_formula <- bf(
+  trial_looking_time ~ a * exp(b * trial_number),  # The equation
+  a + b ~ 1 + (1|subject),                         # Random intercepts for 'a' and 'b'
+  nl = TRUE
+)
+
+priors <- c(
+  prior(normal(7500, 2000), nlpar = "a", lb = 0),     # a is presumably large and positive
+  prior(normal(-0.05, 0.02), nlpar = "b")            # b is negative
+)
+
+bayesian_model <- brm(
+  formula = nl_formula,
+  data = simulated_data,
+  family = gaussian(),   # We'll assume Gaussian residuals
+  prior = priors,
+  chains = 4,            # Number of MCMC chains
+  cores = 4,             # Number of CPU cores for parallel
+  iter = 8000,           # Total iterations per chain
+  warmup = 1000,         # Burn-in/warm-up
+  control = list(adapt_delta = 0.99),  # More conservative adaptation
+  seed = 123
+)
+```
+
+```{r}
+ranef(bayesian_model)$subject %>% as.data.frame() %>% 
+  ggplot(aes(x = Estimate.a_Intercept, y = Estimate.b_Intercept)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+

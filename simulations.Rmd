@@ -1,0 +1,1425 @@
+---
+title: "Simulation o"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    toc_float: true
+---
+
+
+
+
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(lme4)
+library(nlme)
+
+source("helper/volatility.R")
+source("helper/slope.R")
+```
+
+
+The goal of this simulation is to test whether the current analytical approach can control for confounds.
+
+
+# 1. create confounding dataset (linearlly related last trial and dishabituation trial)
+
+
+Takeaway: This section generates synthetic data where the deviant trial is linearly related to the last habituation trial, introducing a confound.
+
+
+```{r}
+
+set.seed(123)
+
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 100) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(3, 5), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+    deviant_time <- 1.2 * habituation_times[n_trials] + rnorm(1, 0, 500)
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+
+# Generate dataset
+fake_data_last_trial <- generate_fake_data(n_subjects = 100)
+
+```
+
+
+```{r}
+habituation_data <-  fake_data_last_trial %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, trial_looking_time) 
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_last_trial %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_last_trial  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num)
+```
+
+
+
+## 1.1. constructed relationship
+
+
+Visualizes the constructed linear relationship between the last habituation trial and the deviant trial.
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_last_trial  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(title = "dishab raw ~ last trial", subtitle =  "last trial vs dishab raw")
+```
+
+## 1.2 slope relationship
+
+Explores the relationship between decay rate and dishabituation difference, no relationship 
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(title = "dishab raw ~ last trial", subtitle =  "slope vs dishab")
+```
+
+
+# 2. create confounding dataset (linearlly related first trial and dishabituation trial)
+
+Generates synthetic data where the deviant trial is linearly related to the first habituation trial
+
+
+```{r}
+set.seed(123)
+
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+     # Generate habituation times that always go down
+    initial_looking_time <- runif(1, 5000, 10000)
+    habituation_times <- sort(runif(n_trials, 500, 5000), decreasing = TRUE)
+
+    # Make sure the values never go below zero
+    habituation_times <- pmax(habituation_times, 500)
+    
+    deviant_time <- 1.5 * habituation_times[1] + rnorm(1, 0, 500)  # Linearly related to the first trial
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+
+# Generate dataset
+fake_data_fist_trial <- generate_fake_data(n_subjects = 50)
+
+fake_data_fist_trial %>% write_csv(here("data/simulations/sim_ft.csv"))
+
+```
+
+
+```{r}
+habituation_data <-  fake_data_fist_trial %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, trial_looking_time) 
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_fist_trial %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_fist_trial  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num)
+```
+
+
+
+## 2.1. constructed relationship
+
+### 2.1.1 first trial vs dishab
+
+Confirm the constructed relationship 
+
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_fist_trial  %>% filter(trial_number == 1),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "dishab raw ~ first trial", 
+    subtitle = "dishab raw ~ first trial"
+  )
+```
+
+### 2.1.2 last trial vs dishab raw 
+
+Checking the impact on the last trial and the dishab raw, there's an impact 
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_fist_trial  %>% group_by(subject) %>% filter(trial_number == (max(trial_number) -1)),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+   labs(
+    title = "dishab raw ~ first trial", 
+    subtitle = "dishab raw ~ last trial"
+  )
+```
+
+## 2.2 slope?!?!
+
+Explores the relationship between decay rate and dishabituation difference, negative relationship
+
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "dishab raw ~ first trial", 
+    subtitle = "dishab diff ~ slope"
+  )
+```
+
+# 3. REAL: slope and dishabituation directly related
+
+Generates data where the deviant trial is explicitly related to the decay rate -- this is kind of what we want to see in the dataset  
+
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+    deviant_time <- 10000 * decay_rate + rnorm(1, 0, 500)  # Linearly related to the decay slope
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_slope <- generate_fake_data(n_subjects = 50)
+fake_data_slope %>% write_csv(here("data/simulations/sim_dr.csv"))
+```
+
+```{r}
+habituation_data <-  fake_data_slope %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, trial_looking_time) 
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_slope %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_slope  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num)
+```
+
+## 3.1.  relationships
+
+ Tests correlations between first/last trials and dishabituation time
+
+### 3.1.1 first trial vs dishab 
+
+
+```{r}
+
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_slope  %>% filter(trial_number == 1),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "dishab raw ~ slope", 
+    subtitle = "dishab raw ~ first trial"
+  )
+```
+
+### 3.1.2 last trial vs dishab raw
+
+
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_slope  %>% group_by(subject) %>% filter(trial_number == (max(trial_number) -1)),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "dishab raw ~ slope", 
+    subtitle = "dishab raw ~ last trial"
+  )
+```
+
+## 3.2 slope?!?
+
+decay rate and dishabituation difference
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "dishab raw ~ slope", 
+    subtitle = "dishab diff ~ slope"
+  )
+```
+
+
+
+# 4. non-confounding relationship 
+
+Now let's create a dataset that the dishabituation time is arbitrarily high 
+
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+    deviant_time <- runif(1, 10000, 15000)  # Arbitrarily high but independent of previous trials
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_nr <- generate_fake_data(n_subjects = 50)
+```
+
+```{r}
+habituation_data <-  fake_data_nr %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, trial_looking_time) 
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_nr %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_nr  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(dishab_diff = log(dishab_raw) - log(trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_trial_num)
+```
+
+## 4.1. relationships 
+
+### 4.1.1 first trial vs dishab
+
+check the relationship between first trial and dishabituation 
+
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_nr  %>% filter(trial_number == 1),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab raw ~ first trial"
+  )
+```
+
+### 4.1.2 last trial vs dishab 
+
+check the relationship between last trial and dishabituation 
+
+```{r}
+adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_nr  %>% group_by(subject) %>% filter(trial_number == (max(trial_number) -1)),
+    by = c("subject", "block_number")
+  ) %>% 
+  ggplot(aes(x = trial_looking_time, y = dishab_raw)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+   labs(
+    title = "No relationship", 
+    subtitle = "dishab raw ~ last trial"
+  )
+```
+
+## 4.2 slope?!?
+
+yet still there exists a relationship between the slope and the dishabituation difference 
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab diff ~ slope"
+  )
+```
+
+## 4.3 raw data 
+
+weird, what does it look like? 
+
+```{r}
+fake_data_nr %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time)) + 
+  geom_point(position = position_jitter(width = .2)) + 
+  facet_wrap(~deviant_position)
+```
+
+## 4.4. why the relationship? 
+
+1. The last habituation trial value depends inversely on the decay rate (higher decay → smaller last trial values).
+
+2. The dishabituation difference is computed as a logarithmic ratio involving the last trial time. When t_last is smaller (due to a higher decay rate), the log difference grows larger, creating a spurious correlation.
+
+```{r}
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+
+    # Make the deviant trial completely independent by adding a large random value
+    deviant_time <- runif(1, 15000, 20000)  # Arbitrarily high but independent of previous trials
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      decay_rate = decay_rate,  # Include decay rate for analysis
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data <- generate_fake_data(n_subjects = 50)
+
+# Visualization: Relationship between decay rate and last trial time
+last_trial_data <- fake_data %>% 
+  group_by(subject) %>% 
+  filter(trial_number == max(trial_number) - 1)  # Select last habituation trial
+
+# Plot decay rate vs last trial looking time
+ggplot(last_trial_data, aes(x = decay_rate, y = trial_looking_time)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  labs(
+    title = 'Decay Rate vs Last Habituation Trial Time',
+    x = 'Decay Rate',
+    y = 'Last Trial Looking Time'
+  )
+```
+
+## 4.5 try normalizing by the first trial??? 
+
+still doesn't work. even though the deviant time is independent, the first trial indirectly scales the entire decay trajectory. Here's the subtle issue:
+
+```{r}
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_nr  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  left_join(
+    fake_data_nr %>% group_by(subject, block_number)  %>% filter(trial_number == 1) %>% rename(first_trial_looking_time = trial_looking_time) %>% select(subject, block_number, first_trial_looking_time)
+,
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(
+    dishab_diff = log(dishab_raw) - log(trial_looking_time), 
+    dishab_normalized = (dishab_raw / first_trial_looking_time)) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_normalized, dishab_trial_num, first_trial_looking_time)
+
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_normalized)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab diff ~ slope"
+  )
+```
+
+## 4.6 try modeling 
+
+
+```{r}
+
+model_d <- adult_dishab_d %>% 
+  left_join(adult_slope_df)
+
+lm(
+  dishab_diff ~ decay_rate, 
+  data = model_d
+) %>% summary()
+
+lm(
+  dishab_diff ~ decay_rate + first_trial_looking_time, 
+  data = model_d
+) %>% summary()
+
+lm(
+  dishab_diff ~  first_trial_looking_time, 
+  data = model_d
+) %>% 
+  summary()
+```
+
+# 5. REAL non-confounding!! 
+
+now let's create another non-confounding dataset?!? 
+
+```{r}
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Generate habituation times that always go down
+    initial_looking_time <- runif(1, 5000, 10000)
+    habituation_times <- sort(runif(n_trials, 500, 5000), decreasing = TRUE)
+
+    # Make sure the values never go below zero
+    habituation_times <- pmax(habituation_times, 500)
+
+    # Generate deviant trial looking time that is higher than the last habituation time
+    deviant_time <-runif(1, 20000, 30000)
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(
+      data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_rnr <- generate_fake_data(n_subjects = 50)
+fake_data_rnr %>% write_csv(here("data/simulations/sim_nr.csv"))
+```
+
+```{r}
+habituation_data <-  fake_data_rnr %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, trial_looking_time) 
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_rnr %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, trial_looking_time) %>% 
+  rename(dishab_raw = trial_looking_time) %>% 
+  left_join(
+    fake_data_rnr  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  left_join(
+    fake_data_rnr %>% group_by(subject, block_number)  %>% filter(trial_number == 1) %>% rename(first_trial_looking_time = trial_looking_time) %>% select(subject, block_number, first_trial_looking_time)
+,
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(
+    dishab_log_diff = log(dishab_raw) - log(trial_looking_time),
+    dishab_diff = dishab_raw - trial_looking_time) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff, dishab_log_diff, first_trial_looking_time, dishab_trial_num)
+```
+
+
+## 5.1. slope? 
+
+check the slope....
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab diff ~ slope"
+  )
+
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_log_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab log diff ~ slope"
+  )
+```
+
+
+## 5.2 try modeling??
+
+```{r}
+
+model_d <- adult_dishab_d %>% 
+  left_join(adult_slope_df)
+
+lm(
+  dishab_diff ~ decay_rate, 
+  data = model_d
+) %>% summary()
+
+
+lm(
+  dishab_log_diff ~ decay_rate, 
+  data = model_d
+) %>% summary()
+
+lm(
+  dishab_diff ~ decay_rate + first_trial_looking_time, 
+  data = model_d
+) %>% summary()
+
+lm(
+  dishab_diff ~  first_trial_looking_time, 
+  data = model_d
+) %>% 
+  summary()
+```
+
+# 6. Try control by residualized
+
+
+```{r}
+fake_data_rnr
+
+fake_data_rnr$trial_type_numeric <- as.numeric(as.factor(fake_data_rnr$trial_type))
+
+
+# Define the nonlinear model
+exp_decay <- function(trial_number, trial_type_numeric, a, b) {
+  a * exp(b * trial_number * trial_type_numeric)
+}
+
+# Fit the model
+habituation_model <- nlme(
+  trial_looking_time ~ exp_decay(trial_number, trial_type_numeric, a, b),
+  data = fake_data_rnr,
+  fixed = a + b ~ 1,
+  random =  b ~ 1 + trial_number | subject,  # Add random intercept
+  start = c(a = mean(fake_data_rnr$trial_looking_time), 
+            b = -0.01),          # Adjust starting values
+  control = nlmeControl(msMaxIter = 200, pnlsTol = 1e-6)
+)
+
+fake_data_rnr$resid = resid(habituation_model)
+
+
+adult_dishab_raw <- fake_data_rnr %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, resid) %>% 
+  rename(dishab_raw = resid) %>% 
+  left_join(
+    fake_data_rnr  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(
+    dishab_diff_resid = dishab_raw - resid) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_diff_resid, dishab_trial_num)
+
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_diff_resid)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab log diff ~ slope"
+  )
+```
+
+## 6.1. piece-wise combination 
+
+change the model by piece wise combination - this works! 
+
+```{r}
+# Separate habituation and deviant trials
+habituation_data <- fake_data_rnr %>%
+  filter(trial_type == "background")  # Habituation trials only
+
+deviant_data <- fake_data_rnr %>%
+  filter(trial_type == "deviant")  # Deviant trial only
+
+# Nonlinear mixed-effects model for habituation trials
+habituation_model <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data = habituation_data,
+  fixed = a + b ~ 1,                    # Fixed effects for decay
+  random = b ~ 1 | subject,         # Random intercept and slope
+  start = c(a = mean(habituation_data$trial_looking_time), b = -0.1),        # Initial guesses for parameters
+  control = nlmeControl(msMaxIter = 200, pnlsTol = 1e-6)  # Controls for stability
+)
+
+deviant_model <- lme(
+  trial_looking_time ~ 1,  # Deviant trial modeled as intercept-only
+  random = ~ 1 | subject,  # Random intercept to account for subject variability
+  data = deviant_data
+)
+
+habituation_data$resid_hab <- resid(habituation_model)
+deviant_data$resid_dev <- resid(deviant_model)
+
+# Merge the residuals for analysis
+combined_residuals <- habituation_data %>%
+  select(subject, trial_number, resid_hab) %>%
+  bind_rows(
+    deviant_data %>%
+      select(subject, trial_number, resid_dev) %>%
+      rename(resid_hab = resid_dev)
+  )
+
+
+random_effects <- ranef(habituation_model)$b
+fixed_decay_rate <- fixef(habituation_model)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+
+
+
+deviant_resid_data <- deviant_data %>%
+  mutate(decay_rate = individual_decay_rates)
+
+
+ggplot(deviant_resid_data, aes(x = decay_rate, y = resid_dev)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Decay Rate vs Deviant Residuals",
+       x = "Decay Rate",
+       y = "Deviant Residuals")
+```
+
+
+# 7. do Z score within participant 
+
+
+```{r}
+fake_data_rnr <-  fake_data_rnr %>% group_by(subject) %>%
+  mutate(z_score_looking_time = (trial_looking_time - mean(trial_looking_time)) / sd(trial_looking_time)) %>%
+  ungroup()
+
+
+fake_data_rnr
+```
+
+```{r}
+habituation_data <-  fake_data_rnr %>% 
+  # fist block
+  # before the dishabituation trials
+  filter(trial_number < deviant_position) %>% 
+  # only keeping the relevant information 
+  select(subject, trial_number, z_score_looking_time) %>% 
+  rename(trial_looking_time = z_score_looking_time)
+
+adult_slope_df <- get_individual_slope(habituation_data)
+
+
+
+adult_dishab_raw <- fake_data_rnr %>% 
+  filter(trial_number == deviant_position) 
+
+adult_dishab_d <- adult_dishab_raw %>% 
+  select(subject,block_number, z_score_looking_time, trial_looking_time) %>% 
+  rename(dishab_raw = z_score_looking_time) %>% 
+  left_join(
+    fake_data_rnr  %>% filter(trial_number < deviant_position) %>% group_by(subject, block_number) %>% filter(trial_number == max(trial_number)),
+    by = c("subject", "block_number")
+  ) %>% 
+  # calculating the key 
+  mutate(
+    dishab_z_score_diff = dishab_raw - z_score_looking_time) %>% 
+  mutate(dishab_trial_num = trial_number + 1) %>% 
+  select(subject, dishab_z_score_diff, dishab_trial_num)
+```
+
+```{r}
+adult_dishab_d %>% 
+  left_join(adult_slope_df) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_z_score_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(
+    title = "No relationship", 
+    subtitle = "dishab log diff ~ slope"
+  )
+```
+
+# 8. Try to see if the piece-wise destroy the constructed relationship? 
+
+no -- if there's a real realtionship it's still there! 
+
+```{r}
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+    deviant_time <- 10000 * decay_rate + rnorm(1, 0, 500)  # Linearly related to the decay slope
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_slope <- generate_fake_data(n_subjects = 50)
+
+```
+
+
+```{r}
+# Separate habituation and deviant trials
+habituation_data <- fake_data_slope %>%
+  filter(trial_type == "background")  # Habituation trials only
+
+deviant_data <- fake_data_slope %>%
+  filter(trial_type == "deviant")  # Deviant trial only
+
+# Nonlinear mixed-effects model for habituation trials
+habituation_model <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data = habituation_data,
+  fixed = a + b ~ 1,                    # Fixed effects for decay
+  random = b ~ 1 | subject,         # Random intercept and slope
+  start = c(a = mean(habituation_data$trial_looking_time), b = -0.1),        # Initial guesses for parameters
+  control = nlmeControl(msMaxIter = 200, pnlsTol = 1e-6)  # Controls for stability
+)
+
+deviant_model <- lme(
+  trial_looking_time ~ 1,  # Deviant trial modeled as intercept-only
+  random = ~ 1 | subject,  # Random intercept to account for subject variability
+  data = deviant_data
+)
+
+habituation_data$resid_hab <- resid(habituation_model)
+deviant_data$resid_dev <- resid(deviant_model)
+
+# Merge the residuals for analysis
+combined_residuals <- habituation_data %>%
+  select(subject, trial_number, resid_hab) %>%
+  bind_rows(
+    deviant_data %>%
+      select(subject, trial_number, resid_dev) %>%
+      rename(resid_hab = resid_dev)
+  )
+
+
+random_effects <- ranef(habituation_model)$b
+fixed_decay_rate <- fixef(habituation_model)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+
+
+
+deviant_resid_data <- deviant_data %>%
+  mutate(decay_rate = individual_decay_rates)
+
+
+ggplot(deviant_resid_data, aes(x = decay_rate, y = resid_dev)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Decay Rate vs Deviant Residuals",
+       x = "Decay Rate",
+       y = "Deviant Residuals")
+```
+
+
+# 9. chop last trial 
+
+## 9.1 confounding relationship 
+
+```{r}
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(7, 9), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Generate habituation times that always go down
+    initial_looking_time <- runif(1, 5000, 10000)
+    habituation_times <- sort(runif(n_trials, 500, 5000), decreasing = TRUE)
+
+    # Make sure the values never go below zero
+    habituation_times <- pmax(habituation_times, 500)
+
+    # Generate deviant trial looking time that is higher than the last habituation time
+    deviant_time <-runif(1, 20000, 30000)
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(
+      data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_rnr <- generate_fake_data(n_subjects = 50)
+```
+
+
+```{r}
+habituation_data <- fake_data_rnr %>% 
+  filter(trial_number < deviant_position - 1)
+
+habituation_model <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data = habituation_data,
+  fixed = a + b ~ 1,                    # Fixed effects for decay
+  random = b ~ 1 | subject,         # Random intercept and slope
+  start = c(a = mean(habituation_data$trial_looking_time), b = -0.1),        # Initial guesses for parameters
+  control = nlmeControl(msMaxIter = 200, pnlsTol = 1e-6)  # Controls for stability
+)
+
+
+
+random_effects <- ranef(habituation_model)$b
+fixed_decay_rate <- fixef(habituation_model)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+habituation_data <- habituation_data %>% 
+  distinct(subject, deviant_position) %>% 
+  mutate(decay_rate = individual_decay_rates)
+
+last_hab_trial <- fake_data_rnr %>% 
+  filter(trial_number == deviant_position - 1) %>% 
+  rename(last_hab_looking = trial_looking_time) %>% 
+  select(subject, deviant_position, last_hab_looking)
+
+dev_trial <- fake_data_rnr %>% 
+  filter(trial_number == deviant_position) %>% 
+  rename(dev_looking = trial_looking_time) %>% 
+  select(subject, deviant_position, dev_looking)
+
+dishab_data <- last_hab_trial %>% 
+  left_join(dev_trial, by = c("subject", "deviant_position")) %>% 
+  mutate(dishab_log_diff = log(dev_looking) - log(last_hab_looking), 
+         dishab_raw_diff = dev_looking - last_hab_looking)
+
+dishab_data %>% 
+  left_join(habituation_data, by = c("subject", "deviant_position")) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_log_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+dishab_data %>% 
+  left_join(habituation_data, by = c("subject", "deviant_position")) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_raw_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+## 9.2 constructed relationship 
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Generate synthetic data
+generate_fake_data <- function(n_subjects = 50) {
+  # Create subject IDs
+  subjects <- paste0("S", sprintf("%03d", 1:n_subjects))
+
+  # Initialize empty data frame
+  data <- data.frame()
+
+  # Loop through each subject
+  for (subj in subjects) {
+    # Randomly assign number of habituation trials (4 or 6)
+    n_trials <- sample(c(4, 6), 1)
+    trial_number <- 1:(n_trials + 1)
+
+    # Simulate exponential drop in habituation times with varying slopes
+    initial_looking_time <- runif(1, 5000, 10000)
+    decay_rate <- runif(1, 0.2, 0.5)  # Randomly vary decay rate
+    habituation_times <- initial_looking_time * exp(-decay_rate * (1:n_trials))
+    deviant_time <- 10000 * decay_rate + rnorm(1, 0, 500)  # Linearly related to the decay slope
+
+    # Combine looking times
+    trial_looking_time <- c(habituation_times, deviant_time)
+
+    # Assign trial types
+    trial_type <- c(rep('background', n_trials), 'deviant')
+
+    # Create data frame for subject
+    subject_data <- data.frame(
+      subject = subj,
+      block_number = 1,
+      task_type = 'curiosity',
+      deviant_position = n_trials + 1,
+      trial_number = trial_number,
+      trial_type = trial_type,
+      trial_looking_time = trial_looking_time,
+      stimulus_displayed = paste0('images/stimuli/', sample(1:20, n_trials + 1, replace = TRUE), '_A_a.gif'),
+      task_question_type = 'curiosity_background',
+      task_question_response = sample(1:5, n_trials + 1, replace = TRUE)
+    )
+
+    # Append subject data
+    data <- rbind(data, subject_data)
+  }
+
+  return(data)
+}
+
+# Generate dataset
+fake_data_slope <- generate_fake_data(n_subjects = 50)
+```
+
+
+```{r}
+habituation_data <- fake_data_slope %>% 
+  filter(trial_number < deviant_position - 1)
+
+habituation_model <- nlme(
+  trial_looking_time ~ a * exp(b * trial_number),
+  data = habituation_data,
+  fixed = a + b ~ 1,                    # Fixed effects for decay
+  random = b ~ 1 | subject,         # Random intercept and slope
+  start = c(a = mean(habituation_data$trial_looking_time), b = -0.1),        # Initial guesses for parameters
+  control = nlmeControl(msMaxIter = 200, pnlsTol = 1e-6)  # Controls for stability
+)
+
+
+
+random_effects <- ranef(habituation_model)$b
+fixed_decay_rate <- fixef(habituation_model)["b"]
+individual_decay_rates <- fixed_decay_rate + random_effects
+
+habituation_data <- habituation_data %>% 
+  distinct(subject, deviant_position) %>% 
+  mutate(decay_rate = individual_decay_rates)
+
+last_hab_trial <- fake_data_slope %>% 
+  filter(trial_number == deviant_position - 1) %>% 
+  rename(last_hab_looking = trial_looking_time) %>% 
+  select(subject, deviant_position, last_hab_looking)
+
+dev_trial <- fake_data_slope %>% 
+  filter(trial_number == deviant_position) %>% 
+  rename(dev_looking = trial_looking_time) %>% 
+  select(subject, deviant_position, dev_looking)
+
+dishab_data <- last_hab_trial %>% 
+  left_join(dev_trial, by = c("subject", "deviant_position")) %>% 
+  mutate(dishab_log_diff = log(dev_looking) - log(last_hab_looking), 
+         dishab_raw_diff = dev_looking - last_hab_looking)
+
+dishab_data %>% 
+  left_join(habituation_data, by = c("subject", "deviant_position")) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_log_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+dishab_data %>% 
+  left_join(habituation_data, by = c("subject", "deviant_position")) %>% 
+  ggplot(aes(x = decay_rate, y = dishab_raw_diff)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+

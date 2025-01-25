@@ -4,17 +4,17 @@ library(tidyverse)
 library(here)
 library(lme4)
 library(nlme)
+library(car)
 library(ggcorrplot)
 
 # load real data
 # adult
-
 # take out 1 trial particiapnt
 adult_hab_full <- read_csv(here("data/raw/adult_hab_full.csv")) %>% filter(subject != "SS1630948678486") 
 adult_hab_no_last <- read_csv(here("data/raw/adult_hab_no_last.csv")) %>% filter(subject != "SS1630948678486")
 adult_dishab <- read_csv(here("data/raw/adult_dishab.csv")) %>% filter(subject != "SS1630948678486")
 
-adult_age <- read_csv(here("data/raw/adult_age.csv"))
+adult_age <- read_csv(here("data/raw/adult_age.csv")) %>% mutate(age = age * 12)
 adult_complexity <- read_csv(here("data/raw/adult_complexity.csv"))
 
 
@@ -30,10 +30,10 @@ preschooler_age <- read_csv(here("data/raw/preschooler_age.csv"))
 infant_bad <- read_csv(here("data/raw/infant_bad.csv"))
 infant_one_trial <- read_csv(here("data/raw/infant_one_trial.csv"))
 
-infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
-infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv")) %>%  filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
-infant_dishab <- read_csv(here("data/raw/infant_dishab.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
-infant_age <- read_csv(here("data/raw/infant_age.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) 
+infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv")) %>%  filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(trial_looking_time = trial_looking_time * 1000)
+infant_dishab <- read_csv(here("data/raw/infant_dishab.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(trial_looking_time = trial_looking_time * 1000)
+infant_age <- read_csv(here("data/raw/infant_age.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(age = age /30.4)
 infant_complexity <- read_csv(here("data/raw/infant_complexity.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
 
 
@@ -44,6 +44,54 @@ source(here("helper/format_data.R"))
 source(here("helper/slope.R"))
 source(here("helper/resid.R"))
 source(here("helper/volatility.R"))
+```
+
+# 0. Get Demog
+
+## 0.1 Adults
+
+```{r}
+raw_adult <- read_csv(here("data/raw/adult_raw_with_prolific.csv"))
+prolific_d <- read_csv(here("data/raw/adult_prolific.csv"))
+
+subject_prolific_link <- raw_adult %>% 
+  filter(grepl("p_id", responses)) %>% 
+  mutate(prolific_id = str_extract(responses, '(?<="p_id":")[^"]+')) %>% 
+  select(subject, prolific_id)
+
+link_df <- prolific_d %>% 
+  rename(prolific_id = participant_id) %>% 
+  select(prolific_id, age, Sex) %>% 
+  left_join(subject_prolific_link, by = c("prolific_id"))
+
+adult_demog_full <- link_df %>% 
+  filter(subject %in% adult_hab_full$subject) %>% 
+  filter(subject %in% adult_complexity$subject) 
+
+saveRDS(adult_demog_full, here("cached_results/demog_adult.Rds"))
+
+```
+
+## 0.2 Preschoolers 
+
+```{r}
+preschooler_raw <- read_csv(here("data/raw/preschooler_data.csv"))
+
+preschooler_demog_full <- preschooler_raw %>% 
+  filter(subject %in% preschooler_hab_full$subject) %>% 
+  distinct(subject, age_in_months)
+
+saveRDS(preschooler_demog_full, here("cached_results/demog_preschooler.Rds"))
+```
+
+## 0.3 Infants 
+
+```{r}
+infant_raw <- read_csv(here("data/raw/infant_data.csv"))
+infant_demog_full <- infant_raw %>% distinct(specific_subject_id, sex, agedays) %>% 
+  filter(specific_subject_id %in% infant_hab_full$subject)
+
+saveRDS(infant_demog_full, here("cached_results/demog_infants.Rds"))
 ```
 
 
@@ -120,8 +168,10 @@ dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)
 adult_slope_no_last <- get_individual_slope(adult_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
 preschooler_slope_no_last <- get_individual_slope(preschooler_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
 infant_slope_no_last <- get_individual_slope(infant_hab_no_last, random_structure = list(subject = pdDiag(a + b ~ 1)))
+infant_intercepts_no_last <- get_individual_intercept(infant_hab_no_last, random_structure = list(subject = pdDiag(a + b ~ 1)))
+infant_model_measure_no_last <- infant_slope_no_last %>% left_join(infant_intercepts_no_last, by = c("subject"))
 
-slopes_no_last <- list(adult_slope_no_last, preschooler_slope_no_last, infant_slope_no_last)
+slopes_no_last <- list(adult_slope_no_last, preschooler_slope_no_last, infant_model_measure_no_last)
 diff_raw <- map2(hab_full_datasets, dev_datasets, get_diff_raw_looking_time)
 
 
@@ -261,9 +311,10 @@ adult_slope_full <- get_individual_slope(adult_hab_full, random_structure = list
 preschooler_slope_full <- get_individual_slope(preschooler_hab_full, random_structure = list(subject = pdDiag( b ~ 1)))
 infant_slope_full <- get_individual_slope(infant_hab_full, random_structure = list(subject = pdDiag(a + b ~ 1)))
 infant_intercepts_full <- get_individual_intercept(infant_hab_full, random_structure = list(subject = pdDiag(a + b ~ 1)))
+infant_model_measure_full <- infant_slope_full %>% left_join(infant_intercepts_full, by = c("subject"))
 
 
-slopes_full <- list(adult_slope_full, preschooler_slope_full, infant_slope_full)
+slopes_full <- list(adult_slope_full, preschooler_slope_full, infant_model_measure_full)
 
 
 
@@ -291,6 +342,8 @@ bind_rows(
   geom_smooth(method = "lm") + 
   facet_wrap(~group, scales = "free")
 ```
+
+
 
 
 
@@ -495,6 +548,161 @@ all_measures_no_last
 ```
 
 
+# 6. KEY RESULTS 
+
+## 6.0 random effects for volatility 
+
+```{r}
+
+adult_volatility <- lm(
+  resid_diff ~ sd_resid,
+  data = all_measures_full[[1]]
+)
+  
+adult_null <- lm(
+  resid_diff ~ 1,
+  data = all_measures_full[[1]]
+)
+
+preschooler_volatility <- lm(
+  resid_diff ~ sd_resid,
+  data = all_measures_full[[2]]
+)
+  
+preschooler_null <- lm(
+  resid_diff ~ 1,
+  data = all_measures_full[[2]]
+)
+
+infant_volatility <- lm(
+  resid_diff ~ sd_resid,
+  data = all_measures_full[[3]]
+)
+  
+infant_null <- lm(
+  resid_diff ~ 1,
+  data = all_measures_full[[3]]
+)
+
+
+compare_models(list(adult_volatility, adult_null), 
+               model_names = c("volatility", "null")) %>% mutate(group = "adults")
+
+compare_models(list(preschooler_volatility, preschooler_null), 
+               model_names = c("volatility", "null")) %>% mutate(group = "preschoolers")
+
+compare_models(list(infant_volatility, infant_null), 
+               model_names = c("volatility", "null")) %>% mutate(group = "infants")
+
+
+
+
+```
+
+
+
+
+## 6.1 main results
+
+```{r}
+
+
+adult_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_full[[1]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "adults")
+
+preschooler_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid, data = all_measures_full[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+
+infant_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept , data = all_measures_full[[3]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "infant")
+
+
+# decay rate negative, complexity positive, sd_resid positive
+adult_res %>% saveRDS(here("cached_results/resid_based_model_adult.Rds"))
+# only decay rate positive               
+preschooler_res %>% saveRDS(here("cached_results/resid_based_model_preschooler.Rds"))
+ # decya rate negative, age negative, complexity negative, intercept (starting point) positive
+infant_res%>% saveRDS(here("cached_results/resid_based_model_infant.Rds"))
+
+
+```
+## 6.2 vif 
+
+```{r}
+adult_vif <- vif(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_full[[1]])
+) 
+
+preschooler_vif<- vif(
+  lm(resid_diff ~ decay_rate + age  + sd_resid, data = all_measures_full[[2]])
+) 
+
+infant_vif <- vif(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept , data = all_measures_full[[3]])
+) 
+
+
+adult_vif %>% as.data.frame() %>% rownames_to_column("term") %>%  pivot_wider(names_from = "term", values_from = ".") %>% saveRDS(here("cached_results/vif_adult.Rds"))
+preschooler_vif %>% as.data.frame() %>% rownames_to_column("term") %>%  pivot_wider(names_from = "term", values_from = ".") %>% saveRDS(here("cached_results/vif_preschooler.Rds"))
+infant_vif %>% as.data.frame() %>% rownames_to_column("term") %>%  pivot_wider(names_from = "term", values_from = ".") %>% saveRDS(here("cached_results/vif_infant.Rds"))
+```
+
+
+## 6.3 exploratory 
+```{r}
+
+adult_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_no_last[[1]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "adults")
+
+preschooler_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data = all_measures_no_last[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+
+infant_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_no_last[[3]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "infant")
+
+
+adult_res_check %>% saveRDS(here("cached_results/logdiff_model_adult.Rds"))
+# only complexity positive
+
+
+preschooler_res_check %>% saveRDS(here("cached_results/logdiff_model_preschooler.Rds"))
+# only decay rate MARGINALLY positive
+
+
+infant_res_check %>% saveRDS(here("cached_results/logdiff_model_infant.Rds"))
+# decay rate negative, age negative, complexity negative, intercept (starting point) negative
+
+```
+
+
+```{r}
+resid_diff_model <- lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_full[[3]])
+log_rt_model <-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_no_last[[3]])
+
+summary(resid_diff_model)
+summary(log_rt_model)
+
+```
+
+
 # correlation of decay rate
 
 note that some data are misisng 
@@ -566,6 +774,7 @@ cor_results_full <- bind_rows(
   ) 
 
 
+
 plot_cor_matrix <- function(cor_matrix, group_name) {
   ggcorrplot(cor_matrix, 
              lab = TRUE,  # Show correlation values
@@ -575,9 +784,22 @@ plot_cor_matrix <- function(cor_matrix, group_name) {
     theme_minimal()
 }
 
+
+
+adult_cor_matrix <- cor_results_full$cor_matrix[[1]]
+preschooler_cor_matrix <- cor_results_full$cor_matrix[[2]]
+infant_cor_matrix = cor(all_measures_full[[3]] %>% select(decay_rate, age, sd_resid, intercept) %>% mutate_all(as.numeric), use = "complete.obs")
+
+saveRDS(adult_cor_matrix, here('cached_results/cormatrix_adult.Rds'))
+saveRDS(preschooler_cor_matrix, here('cached_results/cormatrix_preschooler.Rds'))
+saveRDS(infant_cor_matrix, here('cached_results/cormatrix_infant.Rds'))
+
 cor_results_full %>%
   mutate(plot = map2(cor_matrix, group, plot_cor_matrix)) %>%
   pull(plot)
+
+
+cor_matrix %>% plot_cor_matrix("infant")
 ```
 
 
@@ -786,5 +1008,59 @@ bind_rows(model_estimates_df_full %>% mutate(model_type = "residual_based"),
   coord_flip()  + 
   ggthemes::theme_few() + 
   theme(legend.position = "top")
+```
+
+# TABLES 
+
+```{r}
+adult_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_full[[1]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "adults")
+
+preschooler_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid, data = all_measures_full[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+
+infant_res <- broom::tidy(
+  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_full[[3]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "infant")
+
+
+adult_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_no_last[[1]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "adults")
+
+preschooler_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data = all_measures_no_last[[2]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "preschooler")
+
+infant_res_check <- broom::tidy(
+  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_no_last[[3]])
+) %>% 
+   mutate_if(is.numeric, round, 2) %>% 
+  mutate(group= "infant")
+
+
+adult_res_check # only complexity positive
+preschooler_res_check # only decay rate MARGINALLY positive
+infant_res_check # decya rate negative, age negative, complexity negative, intercept (starting point) negative
+
+
+apa_t
+
+nice_table(adult_res) # decay rate negative, complexity positive, sd_resid positive
+preschooler_res # only decay rate positive
+infant_res # decya rate negative, age negative, complexity negative, intercept (starting point) positive
+
 ```
 

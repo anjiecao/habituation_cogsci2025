@@ -1,0 +1,88 @@
+
+```{r}
+adult_hab_full <- read_csv(here("data/raw/adult_hab_full.csv")) %>% filter(subject != "SS1630948678486") 
+preschooler_hab_full <- read_csv(here("data/raw/preschooler_hab_full.csv"))
+infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) 
+
+
+demog_adult <- readRDS(here("cached_results/demog_adult.Rds"))
+demog_preschooler <- readRDS(here("cached_results/demog_preschooler.Rds"))
+demog_infants <- readRDS(here("cached_results/demog_infants.Rds"))
+
+demog_adult_age <- demog_adult %>% summarise(mean = mean(age, na.rm = TRUE), sd = sd(age, na.rm = TRUE)) %>% mutate_if(is.numeric, round, 2)
+demog_adult_sex <- demog_adult %>% group_by(Sex) %>% count() 
+demog_preschooler_age <- demog_preschooler %>% summarise(mean = mean(age_in_months, na.rm = TRUE), sd = sd(age_in_months, na.rm = TRUE)) %>% mutate_if(is.numeric, round, 2)
+demog_infants_age <- demog_infants %>% summarise(mean = mean(agedays, na.rm = TRUE), sd = sd(agedays, na.rm = TRUE)) %>%  mutate_if(is.numeric, round, 2)
+demog_infant_sex <- demog_infants %>% group_by(sex) 
+
+
+```
+
+## Datatasets
+
+We used three datasets, each measuring habituation and dishabituation in adults [@cao2023habituation], preschoolers [@raz2023no], and infants [@kunin2024perceptual]. 
+
+
+#### Adults 
+
+The adult dataset was collected using a web-based, self-paced looking time paradigm. In this experiment, participants were presented with a sequence of animated creatures and could advance to the next trial at their own pace by pressing the down arrow key. Each block consisted of six trials, with one repeating stimulus and one deviant stimulus. The deviant stimulus appeared at either the second, fourth, or sixth trial of the block. Since the current analysis focuses on habituation trajectories, we preprocessed the data to ensure that the deviant stimulus only appeared in the fourth or sixth trial and included only the first block for each participant to prevent across-block habituation effects. The final dataset consists of `r nrow(adult_hab_full %>% distinct(subject))` habituation-dishabituation sequences from `r nrow(adult_hab_full %>% distinct(subject))` English-speaking participants recruited through Prolific (Age: $M$ = `r demog_adult_age$mean` Years, $SD$ = `r demog_adult_age$sd` Years; `r filter(demog_adult_sex, Sex == "Female")$n` F; `r filter(demog_adult_sex, Sex == "Male")$n` M; `r filter(demog_adult_sex, Sex == "DATA EXPIRED")$n` NA).
+
+
+#### Preschoolers
+
+The design of the preschooler study was similar to the adult study, with the key difference that it was administered in person at a university-affiliated preschool in the United States using a laptop. We applied the same preprocessing steps as in the adult dataset to maintain consistency. The final dataset includes  `r nrow(preschooler_hab_full %>% distinct(subject))` habituation-dishabituation sequences from `r nrow(preschooler_hab_full %>% distinct(subject))` participants (Age: $M$ = `r demog_preschooler_age$mean` Months, $SD$ = `r demog_preschooler_age$sd` Months). We note that this dataset is substantially smaller than the two others, and thus will interpret the results with caution.
+
+#### Infants 
+
+The infant dataset was compiled through a systematic literature review and meta-analytic approach, drawing from studies that examined infants' habituation and dishabituation responses in violation-of-expectation (VOE) paradigms. The dataset includes infant-level data from studies published after 1985 that tested typically developing infants between 3 and 12 months of age on expectations about physical objects or agents engaging in intentional actions. A typical paradigm involves two phases: in the habituation phase, infants are presented with a sequence of repeating stimulus. In the test phase, infants are presented with a stimulus that is either perceptually novel but conceptually similar to the repeating stimulus, or conceptually novel but perceptually similar. The current analysis focuses on perceptual dishabituation -- that is, comparing test trials with perceptually novel stimuli to the last dishabituation trial. To ensure data quality, we excluded participants with fewer than three habituation trials. The final dataset includes `r nrow(infant_hab_full %>% distinct(subject))` habituation-dishabituation sequences from `r nrow(infant_hab_full %>% distinct(subject))` participants (Age: $M$ = `r demog_infants_age$mean` Days, $SD$ = `r demog_infants_age$sd` Days; `r filter(demog_infant_sex, sex == "f")$n` F; `r filter(demog_infant_sex, sex == "m")$n` M; `r filter(demog_infant_sex, is.na(sex))$n` NA). 
+
+
+## Analytic approach 
+
+All  analyses  were  conducted  in  R  using the  nlme package [@pinheiro2017package]. All data and analysis scripts can be accessed from XXX. These analyses were exploratory, but we provided a robustness check in section Robustness Check 
+
+#### Selecting exponential decay parameters for each age group. 
+
+We follow the conventions of a vast prior literature [@thompson1966habituation; @sirois2002models; @ashmead1996measuring; @dannemiller1984infant] and model habituation with an exponential decay. Here, we fit a nonlinear mixed-effects (NLME) model with an exponential decay function on each dataset. The function takes the general form of: `LT ~ a * exp(b * trial_number)`. The parameter a is the intercept, representing initial looking time, and b is the decay rate, reflecting the speed of habituation (See FIGURE 1 for schematic illustration of how a and b shapes the habituation trajectory). 
+
+First, we used a data-driven approach to ask, for each age group, which parameters explain variability in habituation across individuals (and thus, which parameters are worth studying as predictors of dishabituation).We selected the model with the lowest Akaike Information Criterion (AIC), with a $\Delta_{AIC} >  4$ suggesting substantial support for the model with lower AIC [@burnham2004multimodel], among the models with the following random effects:
+
+
+1. Random effects on $a$ only – allows individual variation in initial looking time but assumes a shared decay rate across participants.
+
+2. Random effects on $b$ only – allows individual variation in decay rate while assuming a common initial looking time across participants.
+
+3. Random effects on both $a$ and $b$ – allows individual variation in both parameters (Note: In the model, we explicitly assumed a and b are uncorrelated because they are conceptually independent. Moreover, this constraint improves statistical parsimony by reducing model complexity.)
+
+
+#### Additional predictors.
+
+In addition to parameters related to exponential decay, we examined three additional predictors: volatility (how much looking behavior varied over the course of habituation), stimulus complexity (whether the stimuli participants saw were relatively simple or complex), and participant age. Volatility was defined as the standard deviation of the model residuals across habituation trials for each age group, capturing the extent to which looking behavior fluctuates over time [@li2018interactive; @li2023testing]. In the adult datasets, complexity was explicitly manipulated (throughout the experiment, participants saw creatures that had more body parts, or fewer). In the infant dataset, complexity was defined by the domain of the stimuli (studies involving agents acting on objects were deemed more complex than studies involving only inanimate objects). The preschooler dataset did not include complexity information.  Participant age was available for all datasets, and we converted the original units in each dataset to months to facilitate better comparison. Finally, since the infant dataset has sufficient variation to estimate initial looking time for each individual, we include it as a predictor as well.
+
+
+#### Selecting measures of dishabituation.
+
+Our main behavior of interest -- recovering attention to a novel stimulus, after seeing a series of repeated stimuli -- is best captured as a contrast between looking at the novel stimulus and looking at the prior (familiar) stimulus, right before the novel stimulus is shown. But one challenge in selecting a measure of dishabituation is to ensure that it is de-confounded from individual differences in participants' overall tendency to look at stimuli. Thus, we took two approaches to measure this contrast. 
+
+The first was a residual-based approach. Residual is the difference between an observed value and the predicted value from a model. We calculated the dishabituation magnitude as the following: 
+
+$Dishabituation = r_{dishab} - r_{lasthab}$
+
+$r_{dishab}$ was extracted from fitting an intercept-only linear model on all dishabituation trials: `LT ~ lme(trial_looking_time ~ 1,  random = ~ 1 | subject,  data = dishabituation_data)`
+
+$r_{lasthab}$ was extracted from the best-fitting nlme model, representing how much an individual’s looking time on the last habituation trial deviated from what would be expected given the overall pattern of decline in attention across trials for all participants. 
+
+Taking the difference between the two model residuals ensures that dishabituation magnitude is measured relative to each individual's habituation trajectory. In other words, this residual-based approach can effectively control for baseline differences in overall looking time and isolate true attentional recovery from unrelated variability. 
+
+Second, as a robustness check, we also calculated dishabituation magnitude as follow: 
+
+$Dishabituation = log(LT_{dishab}) - log(LT_{lasthab})$
+
+In this supplementary analysis, features of each participant’s habituation trajectory (for all age groups, volatility and decay rate; for infants, volatility, decay rate, and a) was estimated using only the habituation trials preceding the last trial to avoid any potential spurious dependency between the measures of decay rate estimation and dishabituation. 
+
+#### Relating predictors to dishabituation. 
+
+For each age group, we then ran a linear regression model predicting dishabituation magnitude based on decay rate, age, and volatility (for all age groups), stimulus complexity (infants and adults), and initial looking time (in infants). 
+
+
+

@@ -1,0 +1,113 @@
+---
+title: "How to Make a Proceedings Paper Submission"
+bibliography: library.bib
+csl: apa6.csl
+document-params: "10pt, letterpaper"
+
+author-information: > 
+    \author{{\large \bf Morton Ann Gernsbacher (MAG@Macc.Wisc.Edu)} \\ Department of Psychology, 1202 W. Johnson Street \\ Madison, WI 53706 USA
+    \AND {\large \bf Sharon J.~Derry (SDJ@Macc.Wisc.Edu)} \\ Department of Educational Psychology, 1025 W. Johnson Street \\ Madison, WI 53706 USA}
+
+abstract: >
+    Include no author information in the initial submission, to facilitate
+    blind review.  The abstract should be one paragraph, indented 1/8 inch on both sides,
+    in 9~point font with single spacing. The heading 'Abstract'
+    should be 10~point, bold, centered, with one line of space below
+    it. This one-paragraph abstract section is required only for standard
+    six page proceedings papers. Following the abstract should be a blank
+    line, followed by the header 'Keywords' and a list of
+    descriptive keywords separated by semicolons, all in 9~point font, as
+    shown below.
+    
+keywords: >
+    Add your choice of indexing terms or keywords; kindly use a semi-colon; between each term.
+    
+output: cogsci2016::cogsci_paper
+#final-submission: \cogscifinalcopy
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=3, fig.height=3, fig.crop = F, 
+                      fig.pos = "tb", fig.path='figs/',
+                      echo=F, warning=F, cache=F, 
+                      message=F, sanitize = T)
+```
+
+```{r, libraries}
+library(tidyverse)
+library(here)
+library(lme4)
+library(nlme)
+library(car)
+library(ggcorrplot)
+```
+
+```{r}
+# adult
+# take out 1 trial particiapnt
+adult_hab_full <- read_csv(here("data/raw/adult_hab_full.csv")) %>% filter(subject != "SS1630948678486") 
+adult_hab_no_last <- read_csv(here("data/raw/adult_hab_no_last.csv")) %>% filter(subject != "SS1630948678486")
+adult_dishab <- read_csv(here("data/raw/adult_dishab.csv")) %>% filter(subject != "SS1630948678486")
+
+adult_age <- read_csv(here("data/raw/adult_age.csv")) %>% mutate(age = age * 12)
+adult_complexity <- read_csv(here("data/raw/adult_complexity.csv"))
+
+
+# preschooler
+preschooler_hab_full <- read_csv(here("data/raw/preschooler_hab_full.csv"))
+preschooler_hab_no_last <- read_csv(here("data/raw/preschooler_hab_no_last.csv"))
+preschooler_dishab <- read_csv(here("data/raw/preschooler_dishab.csv"))
+preschooler_age <- read_csv(here("data/raw/preschooler_age.csv"))
+
+
+
+# infant
+infant_bad <- read_csv(here("data/raw/infant_bad.csv"))
+infant_one_trial <- read_csv(here("data/raw/infant_one_trial.csv"))
+
+infant_hab_full <- read_csv(here("data/raw/infant_hab_full.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) 
+infant_hab_no_last <- read_csv(here("data/raw/infant_hab_no_last.csv")) %>%  filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(trial_looking_time = trial_looking_time * 1000)
+infant_dishab <- read_csv(here("data/raw/infant_dishab.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(trial_looking_time = trial_looking_time * 1000)
+infant_age <- read_csv(here("data/raw/infant_age.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject) %>% mutate(age = age /30.4)
+infant_complexity <- read_csv(here("data/raw/infant_complexity.csv")) %>% filter(!subject %in% infant_bad$subject, !subject %in% infant_one_trial$subject)
+
+
+
+source(here("helper/fit_model.R"))
+source(here("helper/compare_model.R"))
+source(here("helper/format_data.R"))
+source(here("helper/slope.R"))
+source(here("helper/resid.R"))
+source(here("helper/volatility.R"))
+```
+
+```{r child = "01_intro.Rmd"}
+
+```
+
+# Methods
+
+```{r child = "02_methods.Rmd"}
+
+```
+
+
+```{r child = "03_results.Rmd"}
+
+```
+
+```{r child = "04_discussion.Rmd"}
+
+```
+
+
+# References 
+
+```{r}
+# References will be generated automatically by Pandoc and included here.
+# The following code is some latex to format the bibliography. Do not remove it.
+```
+
+\setlength{\parindent}{-0.1in} 
+\setlength{\leftskip}{0.125in}
+\noindent

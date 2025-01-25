@@ -1,0 +1,38 @@
+
+```{r}
+adult_cor_matrix <- readRDS(here("cached_results/adult_cor_matrix.Rds"))
+preschooler_cor_matrix <- readRDS(here("cached_results/preschooler_cor_matrix.Rds"))
+infant_cor_matrix <- readRDS(here("cached_results/infant_cor_matrix.Rds"))
+```
+
+
+In this section, we begin by evaluating whether there is sufficient variability in decay rates to investigate individual differences. We then examine key predictors of dishabituation magnitude, followed by a robustness check on our operationalization of this measure.
+
+#### Exponential decay model selection.
+
+We found sufficient variability in $a$ and $b$ in the infant dataset, and sufficient variability in $b$ in the adult and preschooler dataset. We then used these best-fitting models to extract individual decay rates ($b$; all age groups) and initial looking time ($a$; infants only) for each age group.
+
+
+#### Collinearity between potential predictors of dishabituation
+
+```{r}
+adult_max_cor <- max()
+```
+
+
+Before studying the effects of our predictors on dishabituation, we measured their relationships to each other. Since some of these predictors are conceptually related (i.e. decay rate, volatility, and age), we examined their correlations to assess potential collinearity within each dataset (Figure XX). Most correlations were weak, except that volatility and decay rates showed moderate correlations in adults and preschoolers (STATS) and strong correlation between initial looking time and volatility (STATS). However, variance inflation factors (VIFs) were below standard thresholds for the models in the following section (STATS; STATS; STATS). This indicates that multicollinearity did not pose a major concern in our models.
+
+#### What predicts dishabituation in individual participants?
+
+ Since the preschooler dataset includes significantly less data (N = XXX), we will mainly focus interpreting the results on the infants and adults dataset. First, we found that looking behavior during habituation predicted dishabituation in both infants and adults. In both infants and adults datasets, individuals who habituated more quickly to repeated stimuli also looked longer when a new stimulus appeared (STATS; STATS). For infants, individuals who looked longer to the first habituated stimulus (a) also dishabituated more (STATS). 
+
+We also found that higher volatility predicts greater dishabituation magnitude in adults, though there was no relationship in infants (STATS; STATS). However, the role of complexity and volatility differed: in adults, individuals who viewed complex (vs simple) stimuli throughout the study dishabituated more (STATS), while in infants, individuals who viewed simple stimuli (involving just inanimate objects) dishabituated more than those who viewed more complex stimuli (involving agents interacting with objects) (STATS). Last not but least, in infants, younger age was linked to greater dishabituation (STATS), but there was no significant relationship in neither adult nor the preschooler dataset (STATS; STATS).  In the preschooler dataset, only decay rate was a significant predictor, suggesting that preschoolers who habituated slower showed a larger dishabituation magnitude (STATS). See Table 1 for a summary of the results. 
+
+
+#### Robustness check.
+
+Next, we repeated our analyses using our alternative measure of dishabituation (the difference between the dishabituation trial and the last habituation trial in log seconds). These two measures were moderately to strongly correlated in our three datasets (adults: STAT; preschoolers, STAT; infants: STATS). We repeated the same model selection procedure, dropping data from the last habituation trial to avoid spurious correlations between the habituation parameters and our dependent measure, and the same models had the lowest AICs across the two analyses.
+
+Despite this consistency of which model was selected as the best fitting model, the specific predictors differed slightly when using the log-transformed measure (See Table 1). In adults, only complexity remained a significant predictor of dishabituation magnitude (STATS). In preschoolers, decay rate was only marginally positively associated with dishabituation (STATS). (Given the small sample size, this result should be interpreted with caution.) For infants, the pattern largely mirrored our main analysis, with decay rate, age, and complexity all negatively associated with dishabituation magnitude (STATS). The initial looking time was negatively associated with the dishabituation magnitude (STATS), whereas in the residual-based method, the estimate was marginally positive (STATS). 
+
+Overall, while key relationships between decay rate, age, and complexity showed some consistency across both measures, differences in the sensitivity of the decay rate effects and volatility effects indicate that these operationalizations of dishabituation magnitude do not always yield the same patterns of individual differences.

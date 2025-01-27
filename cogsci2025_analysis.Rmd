@@ -6,6 +6,7 @@ library(lme4)
 library(nlme)
 library(car)
 library(ggcorrplot)
+library(kableExtra)
 
 # load real data
 # adult
@@ -156,7 +157,7 @@ infant_comparisons
 - infant: full 
 
 
-## 2.1. get all the results 
+## 3.1. get all the results 
 
 
 ```{r}
@@ -165,8 +166,8 @@ hab_full_datasets <- list(adult_hab_full, preschooler_hab_full, infant_hab_full)
 dev_datasets <- list(adult_dishab, preschooler_dishab, infant_dishab)
 
 # Get slopes for all hab datasets
-adult_slope_no_last <- get_individual_slope(adult_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
-preschooler_slope_no_last <- get_individual_slope(preschooler_hab_no_last, random_structure = list(subject = pdDiag( b ~ 1)))
+adult_slope_no_last <- get_individual_slope(adult_hab_no_last, random_structure = list(subject = pdDiag(b ~ 1)))
+preschooler_slope_no_last <- get_individual_slope(preschooler_hab_no_last, random_structure = list(subject = pdDiag(b ~ 1)))
 infant_slope_no_last <- get_individual_slope(infant_hab_no_last, random_structure = list(subject = pdDiag(a + b ~ 1)))
 infant_intercepts_no_last <- get_individual_intercept(infant_hab_no_last, random_structure = list(subject = pdDiag(a + b ~ 1)))
 infant_model_measure_no_last <- infant_slope_no_last %>% left_join(infant_intercepts_no_last, by = c("subject"))
@@ -285,7 +286,7 @@ preschooler_comparisons
 infant_comparisons
 ```
 
-## 4.2 get residuals and the thing we wnat 
+## 4.2 get residuals and the thing we want 
 
 
 
@@ -346,8 +347,6 @@ bind_rows(
 
 
 
-
-
 ## 4.3 run all the models 
 
 ```{r}
@@ -367,7 +366,7 @@ joined_results_full_model
 
 joined_results_full_model %>% 
   filter(term == "decay_rate") %>% 
-  ggplot(aes(x= group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
+  ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high)) + 
   geom_pointrange() +
   geom_hline(yintercept = 0) + 
   coord_flip() 
@@ -485,7 +484,7 @@ infant_additional_measures_no_last <- na.omit(infant_additional_measures_no_last
 ```
 
 
-## 5.3 put everything everything together, two ways 
+## 5.3 put everything together, two ways 
 
 ```{r}
 additional_measure_full <- list(adult_additional_measures_full, preschooler_additional_measures_full, infant_additional_measures_full)
@@ -515,7 +514,7 @@ bind_rows(all_measures_no_last[[1]] %>% mutate(group = "adult"),
 
 
 broom::tidy(
-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data =  all_measures_no_last[[2]])
+  lm(log_hab_dev_diff ~ decay_rate + age + sd_resid, data =  all_measures_no_last[[2]])
 ) %>% 
    mutate_if(is.numeric, round, 2) %>% 
   mutate(group= "preschooler")
@@ -537,7 +536,7 @@ bind_rows(all_measures_full[[1]] %>% mutate(group = "adult"),
   mutate_if(is.numeric, round, 2)
 
 broom::tidy(
-  lm(resid_diff ~ decay_rate + age  + sd_resid, data =  all_measures_full[[2]])
+  lm(resid_diff ~ decay_rate + age + sd_resid, data =  all_measures_full[[2]])
 ) %>% 
    mutate_if(is.numeric, round, 2) %>% 
   mutate(group= "preschooler")
@@ -626,6 +625,7 @@ infant_res <- broom::tidy(
   mutate(group= "infant")
 
 
+
 # decay rate negative, complexity positive, sd_resid positive
 adult_res %>% saveRDS(here("cached_results/resid_based_model_adult.Rds"))
 # only decay rate positive               
@@ -694,6 +694,7 @@ infant_res_check %>% saveRDS(here("cached_results/logdiff_model_infant.Rds"))
 
 
 ```{r}
+
 resid_diff_model <- lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_full[[3]])
 log_rt_model <-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_no_last[[3]])
 
@@ -799,7 +800,8 @@ cor_results_full %>%
   pull(plot)
 
 
-cor_matrix %>% plot_cor_matrix("infant")
+# cor_matrix %>% plot_cor_matrix("infant") 
+plot_cor_matrix(infant_cor_matrix, "infants (all predictors)")
 ```
 
 
@@ -844,15 +846,15 @@ all_measures_no_last[[3]] %>%
   geom_smooth(method = "lm")
 
 
-meausre_cor_adults <- all_measures_no_last[[1]] %>% 
+measure_cor_adults <- all_measures_no_last[[1]] %>% 
   select(subject, log_hab_dev_diff) %>% 
   left_join(all_measures_full[[1]] %>% select(subject, resid_dev))
 
-meausre_cor_preschoolers <- all_measures_no_last[[2]] %>% 
+measure_cor_preschoolers <- all_measures_no_last[[2]] %>% 
   select(subject, log_hab_dev_diff) %>% 
   left_join(all_measures_full[[2]] %>% select(subject, resid_dev))
 
-meausre_cor_infants <- all_measures_no_last[[3]] %>% 
+measure_cor_infants <- all_measures_no_last[[3]] %>% 
   select(subject, log_hab_dev_diff) %>% 
   left_join(all_measures_full[[3]] %>% select(subject, resid_dev))
 
@@ -862,17 +864,17 @@ meausre_cor_infants <- all_measures_no_last[[3]] %>%
 ```
 
 ```{r}
-cor(meausre_cor_adults$log_hab_dev_diff, meausre_cor_adults$resid_dev, use = "complete.obs")
-cor(meausre_cor_preschoolers$log_hab_dev_diff, meausre_cor_preschoolers$resid_dev, use = "complete.obs")
-cor(meausre_cor_infants$log_hab_dev_diff, meausre_cor_infants$resid_dev,use = "complete.obs")
+cor(measure_cor_adults$log_hab_dev_diff, measure_cor_adults$resid_dev, use = "complete.obs")
+cor(measure_cor_preschoolers$log_hab_dev_diff, measure_cor_preschoolers$resid_dev, use = "complete.obs")
+cor(measure_cor_infants$log_hab_dev_diff, measure_cor_infants$resid_dev,use = "complete.obs")
 ```
 
 
 ```{r}
 bind_rows(
-  meausre_cor_adults %>% mutate(group = "adults"),
-  meausre_cor_preschoolers %>% mutate(group = "preschoolers"),
-  meausre_cor_infants %>% mutate(group = "infants")
+  measure_cor_adults %>% mutate(group = "adults"),
+  measure_cor_preschoolers %>% mutate(group = "preschoolers"),
+  measure_cor_infants %>% mutate(group = "infants")
 ) %>% 
   ggplot(aes(x = resid_dev, y= log_hab_dev_diff)) + 
   geom_point() + 
@@ -885,11 +887,30 @@ bind_rows(
 # Raw data plots 
 
 ```{r}
-adult_hab_full %>% 
+pic_adult_hab <- adult_hab_full %>% 
   #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
-  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
-  geom_point(alpha = .1) + 
-  geom_line(aes(group = subject), alpha = .1)
+  ggplot(aes(x = trial_number, y = trial_looking_time/1000, group = trial_number)) + 
+  geom_point(alpha = .1, size = 0.5, color = "lightsalmon2") + 
+  geom_line(aes(group = subject), alpha = .08, color = "lightsalmon2") +
+  stat_summary(fun = mean, geom = "point", size = 0.5, color = "royalblue3") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "royalblue3", width = 0.08) +
+  stat_summary(fun = mean, geom = "line", size = 0.3, color = "royalblue3", group = 1) + 
+  labs(x = "Trial Number", y = "Trial Looking Time (s)", title = "Adults: Habituation") +
+  ylim(0,40) +
+  theme_classic()
+pic_adult_hab
+
+pic_adult_dishab <- adult_dishab %>%
+  ggplot(aes(x = factor(1), y = trial_looking_time/1000)) + 
+  theme_classic() +
+  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+  ylim(0, 40) +
+  labs(x = "", y = "Trial Looking Time (s)", title = "Dishabituation") +
+  theme_classic() +
+  theme(axis.text.x = element_text(color = "white"))
+pic_adult_dishab
+
+pic_habdishab_adults <- gridExtra::grid.arrange(pic_adult_hab, pic_adult_dishab, ncol = 2, widths = c(1.5, 1))
 ```
 
 
@@ -903,11 +924,30 @@ adult_hab_full %>%
 ```
 
 ```{r}
-preschooler_hab_full %>% 
-  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
-  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
-  geom_point(alpha = .1) + 
-  geom_line(aes(group = subject), alpha = .1)
+pic_preschooler_hab <- preschooler_hab_full %>% 
+  #filter(subject %in% sample(unique(preschooler_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time/1000, group = trial_number)) + 
+  geom_point(alpha = .1, size = 0.5, color = "lightsalmon2") + 
+  geom_line(aes(group = subject), alpha = .08, color = "lightsalmon2") +
+  stat_summary(fun = mean, geom = "point", size = 0.5, color = "royalblue3") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "royalblue3", width = 0.08) +
+  stat_summary(fun = mean, geom = "line", size = 0.3, color = "royalblue3", group = 1) + 
+  labs(x = "Trial Number", y = "Trial Looking Time (s)", title = "Preschoolers: Habituation") +
+  ylim(0, 20) +
+  theme_classic()
+pic_preschooler_hab
+
+pic_preschooler_dishab <- preschooler_dishab %>%
+  ggplot(aes(x = factor(1), y = trial_looking_time/1000)) + 
+  theme_classic() +
+  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+  ylim(0, 20) +
+  labs(x = "", y = "Trial Looking Time (s)", title = "Dishabituation") +
+  theme_classic() +
+  theme(axis.text.x = element_text(color = "white"))
+pic_preschooler_dishab
+
+pic_habdishab_preschoolers <- gridExtra::grid.arrange(pic_preschooler_hab, pic_preschooler_dishab, ncol = 2, widths = c(1.5, 1))
 ```
 ```{r}
 preschooler_hab_full %>% 
@@ -920,11 +960,30 @@ preschooler_hab_full %>%
 
 
 ```{r}
-infant_hab_full %>% 
-  #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
-  ggplot(aes(x = as.numeric(trial_number), y = trial_looking_time,group = subject)) + 
-  geom_point(alpha = .1) + 
-  geom_line(aes(group = subject), alpha = .1)
+pic_infant_hab <- infant_hab_full %>% 
+  #filter(subject %in% sample(unique(infant_hab_full$subject), 3)) %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = trial_number)) + 
+  geom_point(alpha = .1, size = 0.5, color = "lightsalmon2") + 
+  geom_line(aes(group = subject), alpha = .03, color = "lightsalmon2") +
+  stat_summary(fun = mean, geom = "point", size = 0.5, color = "royalblue3") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "royalblue3", width = 0.08) +
+  stat_summary(fun = mean, geom = "line", size = 0.3, color = "royalblue3", group = 1) + 
+  ylim(0, 125) +
+  labs(x = "Trial Number", y = "Trial Looking Time (s)", title = "Infants: Habituation") +
+  theme_classic()
+pic_infant_hab
+
+pic_infant_dishab <- infant_dishab %>%
+  ggplot(aes(x = factor(1), y = trial_looking_time/1000)) + 
+  theme_classic() +
+  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+  ylim(0, 125) +
+  labs(x = "", y = "Trial Looking Time (s)", title = "Dishabituation") +
+  theme_classic() +
+  theme(axis.text.x = element_text(color = "white"))
+pic_infant_dishab
+
+pic_habdishab_infants <- gridExtra::grid.arrange(pic_infant_hab, pic_infant_dishab, ncol = 2, widths = c(1.5, 1))
 ```
 
 ```{r}
@@ -935,6 +994,15 @@ infant_hab_full %>%
   geom_point(alpha = .3) + 
   geom_line(aes(group = subject), alpha = .3)
 ```
+
+```{r}
+plot_width <- 5
+plot_height <- 2.5
+ggsave("plots/pic_habdishab_adults.png", pic_habdishab_adults, width = plot_width, height = plot_height)
+ggsave("plots/pic_habdishab_preschoolers.png", pic_habdishab_preschoolers, width = plot_width, height = plot_height)
+ggsave("plots/pic_habdishab_infants.png", pic_habdishab_infants, width = plot_width, height = plot_height)
+```
+
 
 # Model estimate plots 
 
@@ -962,6 +1030,19 @@ model_estimates_df_full <- bind_rows(all_measures_full[[1]] %>% mutate(group = "
   mutate(is_sig = (p.value < 0.05)) %>% 
   filter(term != "(Intercept)")
 
+model_estimates_df_full$group <- as.factor(model_estimates_df_full$group)
+model_estimates_df_full$group <- fct_relevel(model_estimates_df_full$group, "infant", "preschooler", "adult")
+levels(model_estimates_df_full$group) <- c("Infants", "Preschoolers", "Adults")
+
+model_estimates_df_full <- model_estimates_df_full %>%
+  mutate(term = case_when(
+    term == "age" ~ "Age",
+    term == "complexitysimple" ~ "Complexity",
+    term == "decay_rate" ~ "Decay Rate",
+    term == "sd_resid" ~ "Volatility",
+    TRUE ~ term  # Keep all other values unchanged
+  ))
+
 model_estimates_df_full %>%
   ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high, color = is_sig)) + 
   geom_pointrange(position = position_dodge(width = .2)) + 
@@ -969,8 +1050,8 @@ model_estimates_df_full %>%
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + 
   coord_flip()  + 
   ggthemes::theme_few() + 
-  theme(legend.position = "top")
-
+  theme(legend.position = "top") +
+  labs(color = "Statistically Significant", x = "Predictors", y = "Estimate", title = "Model Estimates Across Age Groups")
 
 ```
 
@@ -999,6 +1080,19 @@ model_estimates_df_no_last <- bind_rows(all_measures_no_last[[1]] %>% mutate(gro
   filter(term != "(Intercept)") 
 
 
+model_estimates_df_no_last$group <- as.factor(model_estimates_df_no_last$group)
+model_estimates_df_no_last$group <- fct_relevel(model_estimates_df_no_last$group, "infant", "preschooler", "adult")
+levels(model_estimates_df_no_last$group) <- c("Infants", "Preschoolers", "Adults")
+
+model_estimates_df_no_last <- model_estimates_df_no_last %>%
+  mutate(term = case_when(
+    term == "age" ~ "Age",
+    term == "complexitysimple" ~ "Complexity",
+    term == "decay_rate" ~ "Decay Rate",
+    term == "sd_resid" ~ "Volatility",
+    TRUE ~ term  # Keep all other values unchanged
+  ))
+
 bind_rows(model_estimates_df_full %>% mutate(model_type = "residual_based"), 
           model_estimates_df_no_last %>% mutate(model_type = "log_diff")) %>% 
    ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high, shape = model_type, color = is_sig)) + 
@@ -1008,6 +1102,28 @@ bind_rows(model_estimates_df_full %>% mutate(model_type = "residual_based"),
   coord_flip()  + 
   ggthemes::theme_few() + 
   theme(legend.position = "top")
+
+model_estimates_combined <- bind_rows(
+  model_estimates_df_full %>% mutate(model_type = "residual_based"),
+  model_estimates_df_no_last %>% mutate(model_type = "log_diff")
+) 
+
+model_estimates_combined <- model_estimates_combined %>% rename("Model Type" = "model_type")
+model_estimates_combined$`Model Type` <- as.factor(model_estimates_combined$`Model Type`)
+model_estimates_combined$`Model Type` <- fct_relevel(model_estimates_combined$`Model Type`, "residual_based", "log_diff")
+levels(model_estimates_combined$`Model Type`) <- c("Residual-based", "Difference of Log LT")
+
+pic_model_estimates_combined <- model_estimates_combined %>%
+ggplot(aes(x = group, y = estimate, ymin = conf.low, ymax = conf.high, shape = `Model Type`, color = is_sig)) + 
+  geom_pointrange(position = position_dodge(width = .2)) + 
+  facet_grid(rows = vars(`Model Type`), cols = vars(term), scales = "free") +  # Use facet_grid for separate rows by model_type
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + 
+  coord_flip() + 
+  ggthemes::theme_few() + 
+  theme(legend.position = "top") +
+  labs(color = "Statistically Significant", x = "Predictors", y = "Estimate", title = "Model Estimates from Two Approaches")
+
+ggsave("plots/pic_model_estimates_combined.png", pic_model_estimates_combined, width = 8, height = 5)
 ```
 
 # TABLES 
@@ -1051,16 +1167,195 @@ infant_res_check <- broom::tidy(
   mutate(group= "infant")
 
 
+adult_res
+preschooler_res
+infant_res
+
 adult_res_check # only complexity positive
 preschooler_res_check # only decay rate MARGINALLY positive
 infant_res_check # decya rate negative, age negative, complexity negative, intercept (starting point) negative
 
+```
+## best fitting models in single tables
+```{r}
+create_kable_table <- function(data, table_title = "Model Results") {
 
-apa_t
+  data <- data %>%
+    mutate(
+      term = case_when(
+        term == "decay_rate" ~ "Decay Rate",
+        term == "sd_resid" ~ "Residual SD",  
+        term == "complexitysimple" ~ "Complexity",
+        term == "age" ~ "Age",
+        TRUE ~ term
+      )
+    )
+  
+  kable_table <- data %>%
+    select(-group) %>%
+    rename(
+      Coefficient = estimate,
+      `Std. Error` = std.error,
+      `t` = statistic,
+      `p value` = p.value,
+      `Predictor` = term
+    ) %>%
+    mutate(
+      `p value` = if_else(
+        `p value` < 0.001, 
+        "\\textbf{\\textless~.001}",  # Bold and change text for p < 0.001
+        if_else(
+          `p value` < 0.05, 
+          paste0("\\textbf{", str_replace(sprintf("%.3f", `p value`), "^0", ""), "}"),  # Bold for p < 0.05
+          str_replace(sprintf("%.3f", `p value`), "^0", "")  # Regular formatting for other values
+        )
+      )
+    )
+    
+  kable_table %>%
+    kable("latex", booktabs = TRUE, caption = table_title, escape = FALSE) %>%
+    kable_styling(latex_options = c("hold_position"))
+}
 
-nice_table(adult_res) # decay rate negative, complexity positive, sd_resid positive
-preschooler_res # only decay rate positive
-infant_res # decya rate negative, age negative, complexity negative, intercept (starting point) positive
+combine_kable_tables <- function(data1, data2, title1, title2) {
+  table1 <- create_kable_table(data1, title1)
+  table2 <- create_kable_table(data2, title2)
+  
+  combined_table <- paste(table1, table2, sep = "\n")
+  
+  return(combined_table)
+}
 
+cat(create_kable_table(adult_res, "Residual-Based Model (Adults)"))
+cat(create_kable_table(adult_res_check, "Difference of Log LT Model (Adults)"))
+cat(create_kable_table(preschooler_res, "Residual-Based Model (Prschoolers)"))
+cat(create_kable_table(preschooler_res_check, "Difference of Log LT Model (Prschoolers)"))
+cat(create_kable_table(infant_res, "Residual-Based Model (Infants)"))
+cat(create_kable_table(infant_res_check, "Difference of Log LT Model (Infants)"))
+```
+## each age group has a table
+```{r}
+
+create_combined_kable_table <- function(data1, data2, title1, title2, title_age_group) {
+  data1 <- data1 %>%
+    mutate(Model = title1)
+  
+  data2 <- data2 %>%
+    mutate(Model = title2)
+  
+  combined_data <- bind_rows(data1, data2)
+  
+  combined_data <- combined_data %>% mutate(term = str_replace_all(term, "_", "\\\\_")) # Escape underscores in terms
+  
+  # Format the p-value and create the kable table
+  combined_table <- combined_data %>%
+    select(-group) %>%
+    rename(
+      Coefficient = estimate,
+      `Std. Error` = std.error,
+      `t` = statistic,
+      `p value` = p.value,
+      `Predictor` = term
+    ) %>%
+    mutate(
+      `p value` = if_else(
+        `p value` < 0.001, 
+        "\\textbf{\\textless~.001}",  # Bold and change text for p < 0.001
+        if_else(
+          `p value` < 0.05, 
+          paste0("\\textbf{", str_replace(sprintf("%.3f", `p value`), "^0", ""), "}"),  # Bold for p < 0.05
+          str_replace(sprintf("%.3f", `p value`), "^0", "")  # Regular formatting for other values
+        )
+      )
+    )
+  
+  kable_table <- combined_table %>%
+    select(-Model) %>%  # Remove Model column from the display
+    kable("latex", booktabs = TRUE, caption = str_c("Combined Model Results (", title_age_group, ")"), escape = FALSE) %>%
+    kable_styling(latex_options = c("hold_position")) %>%
+    group_rows(title1, 1, nrow(data1)) %>%  # Group rows for the first model
+    group_rows(title2, (nrow(data1) + 1), nrow(combined_data))  # Group rows for the second model
+  
+  return(kable_table)
+}
+
+combined_adult_table <- create_combined_kable_table(adult_res, adult_res_check, "Residual-Based Model", "Difference of Log LT Model", "Adults")
+combined_preschooler_table <- create_combined_kable_table(preschooler_res, preschooler_res_check, "Residual-Based Model", "Difference of Log LT Model", "Preschoolers")
+combined_infant_table <- create_combined_kable_table(infant_res, infant_res_check, "Residual-Based Model", "Difference of Log LT Model", "Infants")
+
+cat(combined_adult_table)
+cat(combined_preschooler_table)
+cat(combined_infant_table)
+
+```
+
+## one giant table
+```{r}
+adult_res <- adult_res %>% mutate(model = "Resisual-Based")
+preschooler_res <- preschooler_res %>% mutate(model = "Resisual-Based")
+infant_res <- infant_res %>% mutate(model = "Resisual-Based")
+
+adult_res_check <- adult_res_check %>% mutate(model = "Difference of Log LT")
+preschooler_res_check <- preschooler_res_check %>% mutate(model = "Difference of Log LT")
+infant_res_check <- infant_res_check %>% mutate(model = "Difference of Log LT")
+
+all_combined_data <- bind_rows(adult_res, preschooler_res, infant_res, adult_res_check, preschooler_res_check, infant_res_check)
+
+all_combined_data <- all_combined_data %>% rename(
+      Coefficient = estimate,
+      `Std. Error` = std.error,
+      `t` = statistic,
+      `p value` = p.value,
+      `Predictor` = term,
+       `Age Group`= group,
+      Model = model
+    ) %>%
+    mutate(
+      `p value` = if_else(
+        `p value` < 0.001, 
+        "\\textbf{\\textless~.001}",  # Bold and change text for p < 0.001
+        if_else(
+          `p value` < 0.05, 
+          paste0("\\textbf{", str_replace(sprintf("%.3f", `p value`), "^0", ""), "}"),  # Bold for p < 0.05
+          str_replace(sprintf("%.3f", `p value`), "^0", "")  # Regular formatting for other values
+        )
+      )
+    )
+
+
+formatted_data <- all_combined_data %>%
+  mutate(`p value` = ifelse(`p value` < 0.001, "< .001", formatC(`p value`, format = "f", digits = 3))) %>%
+  select(Predictor, Coefficient, `Std. Error`, t, `p value`, `Age Group`, Model) %>%
+  arrange(`Age Group`, Model, Predictor)
+
+# Generate the LaTeX table
+latex_table <- ""
+
+for (group in unique(formatted_data$`Age Group`)) {
+  group_data <- formatted_data %>% filter(`Age Group` == group)
+  
+  latex_table <- paste0(
+    latex_table,
+    "\\textbf{", group, "}\\\\\n"  # Bold group title
+  )
+  
+  for (model in unique(group_data$Model)) {
+    model_data <- group_data %>% filter(Model == model)
+    
+    latex_table <- paste0(
+      latex_table,
+      "\\hspace{1em}\\textit{", model, "}\\\\\n"  # Indented italic model title
+    )
+    
+    model_table <- model_data %>%
+      select(-`Age Group`, -Model) %>%  # Remove the Group and Model columns
+      kable("latex", booktabs = TRUE, linesep = "", col.names = NULL) %>%
+      gsub("\\\\addlinespace", "", .)  # Remove extra spaces between rows
+    
+    latex_table <- paste0(latex_table, model_table, "\n")
+  }
+}
+
+cat(latex_table)
 ```
 

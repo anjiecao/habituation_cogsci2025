@@ -794,12 +794,12 @@ adult_cor_df <- all_measures_full[[1]] %>%
   select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) 
 
 adult_cor_df <- na.omit(adult_cor_df)
-correlation_matrix <- cor(adult_cor_df, use = "complete.obs")
+adult_correlation_matrix <- cor(adult_cor_df, use = "complete.obs")
 p_value_matrix <- rcorr(as.matrix(adult_cor_df))$P
 p_value_matrix[is.na(p_value_matrix)] <- 1
 
 
-corrplot(correlation_matrix, 
+corrplot(adult_correlation_matrix, 
          p.mat = p_value_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "adult") 
 
@@ -808,12 +808,12 @@ preschooler_cor_df <- all_measures_full[[2]] %>%
   select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) 
 
 preschooler_cor_df <- na.omit(preschooler_cor_df)
-correlation_matrix <- cor(preschooler_cor_df, use = "complete.obs")
+preschooler_correlation_matrix <- cor(preschooler_cor_df, use = "complete.obs")
 p_value_matrix <- rcorr(as.matrix(preschooler_cor_df))$P
 p_value_matrix[is.na(p_value_matrix)] <- 1
 
 
-corrplot(correlation_matrix, 
+corrplot(preschooler_correlation_matrix, 
          p.mat = p_value_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "preschooler") 
 
@@ -822,14 +822,21 @@ infant_cor_df <- all_measures_full[[3]] %>%
   select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff, intercept) 
 
 infant_cor_df <- na.omit(infant_cor_df)
-correlation_matrix <- cor(infant_cor_df, use = "complete.obs")
+infant_correlation_matrix <- cor(infant_cor_df, use = "complete.obs")
 p_value_matrix <- rcorr(as.matrix(infant_cor_df))$P
 p_value_matrix[is.na(p_value_matrix)] <- 1
 
 
-corrplot(correlation_matrix, 
+corrplot(infant_correlation_matrix, 
          p.mat = p_value_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "infant") 
+
+
+
+saveRDS(adult_correlation_matrix, here('cached_results/cormatrix_adult.Rds'))
+saveRDS(preschooler_correlation_matrix, here('cached_results/cormatrix_preschooler.Rds'))
+saveRDS(infant_correlation_matrix, here('cached_results/cormatrix_infant.Rds'))
+
 ```
 
 
@@ -860,10 +867,6 @@ plot_cor_matrix <- function(cor_matrix, group_name) {
 adult_cor_matrix <- cor_results_full$cor_matrix[[1]]
 preschooler_cor_matrix <- cor_results_full$cor_matrix[[2]]
 infant_cor_matrix = cor(all_measures_full[[3]] %>% select(decay_rate, age, sd_resid, intercept) %>% mutate_all(as.numeric), use = "complete.obs")
-
-saveRDS(adult_cor_matrix, here('cached_results/cormatrix_adult.Rds'))
-saveRDS(preschooler_cor_matrix, here('cached_results/cormatrix_preschooler.Rds'))
-saveRDS(infant_cor_matrix, here('cached_results/cormatrix_infant.Rds'))
 
 cor_results_full %>%
   mutate(plot = map2(cor_matrix, group, plot_cor_matrix)) %>%
@@ -933,9 +936,9 @@ meausre_cor_infants <- all_measures_no_last[[3]] %>%
 ```
 
 ```{r}
-cor(meausre_cor_adults$log_hab_dev_diff, meausre_cor_adults$resid_dev, use = "complete.obs")
-cor(meausre_cor_preschoolers$log_hab_dev_diff, meausre_cor_preschoolers$resid_dev, use = "complete.obs")
-cor(meausre_cor_infants$log_hab_dev_diff, meausre_cor_infants$resid_dev,use = "complete.obs")
+cor(meausre_cor_adults$log_hab_dev_diff, meausre_cor_adults$resid_diff, use = "complete.obs")
+cor(meausre_cor_preschoolers$log_hab_dev_diff, meausre_cor_preschoolers$resid_diff, use = "complete.obs")
+cor(meausre_cor_infants$log_hab_dev_diff, meausre_cor_infants$resid_diff,use = "complete.obs")
 ```
 
 

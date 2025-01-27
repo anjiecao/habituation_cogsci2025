@@ -1,5 +1,5 @@
 ---
-title: "How to Make a Proceedings Paper Submission"
+title: "Individual differences in habituation rate and behavioral volatility predict dishabituation in adults, preschoolers and infants"
 bibliography: library.bib
 csl: apa6.csl
 document-params: "10pt, letterpaper"
@@ -9,20 +9,19 @@ author-information: >
     \AND {\large \bf Sharon J.~Derry (SDJ@Macc.Wisc.Edu)} \\ Department of Educational Psychology, 1025 W. Johnson Street \\ Madison, WI 53706 USA}
 
 abstract: >
-    Include no author information in the initial submission, to facilitate
-    blind review.  The abstract should be one paragraph, indented 1/8 inch on both sides,
-    in 9~point font with single spacing. The heading 'Abstract'
-    should be 10~point, bold, centered, with one line of space below
-    it. This one-paragraph abstract section is required only for standard
-    six page proceedings papers. Following the abstract should be a blank
-    line, followed by the header 'Keywords' and a list of
-    descriptive keywords separated by semicolons, all in 9~point font, as
-    shown below.
+     From infancy to adulthood, habituation and dishabituation enable learners to filter out repetitive information and remain attentive to novelty. Here, we leveraged large-scale datasets spanning infants, preschoolers, and adults to examine how individual differences in habituation parameters (e.g., decay rate, attention variability) predict dishabituation. We found that faster habituation consistently related to stronger attention recovery to novel stimuli. In addition, higher variability in looking behavior during repeated stimulus exposures predicted greater dishabituation in adults. We also observed that different measures of dishabituation yielded somewhat divergent patterns, highlighting the importance of robustness checks on exploratory analysis. These findings reveal how endogenous factors are meaningful drivers of looking behaviors. Overall, our results underscore the need for large-scale data approaches to studying visual attention across the lifespan.
+
     
 keywords: >
-    Add your choice of indexing terms or keywords; kindly use a semi-colon; between each term.
+    habituation; looking time; mega-analysis; individual differences
     
 output: cogsci2016::cogsci_paper
+
+header-includes   :
+   \usepackage{booktabs}
+   \usepackage{graphicx} 
+   \usepackage{makecell} 
+    
 #final-submission: \cogscifinalcopy
 ---
 

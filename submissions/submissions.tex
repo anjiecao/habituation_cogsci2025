@@ -52,8 +52,10 @@
 % \textwidth 16cm
 % \textheight 21cm
 
-\title{How to Make a Proceedings Paper Submission}
+\title{Individual differences in habituation rate and behavioral
+volatility predict dishabituation in adults, preschoolers and infants}
 
+\usepackage{booktabs} \usepackage{graphicx} \usepackage{makecell}
 
 \author{{\large \bf Morton Ann Gernsbacher (MAG@Macc.Wisc.Edu)} \\ Department of Psychology, 1202 W. Johnson Street \\ Madison, WI 53706 USA \AND {\large \bf Sharon J.~Derry (SDJ@Macc.Wisc.Edu)} \\ Department of Educational Psychology, 1025 W. Johnson Street \\ Madison, WI 53706 USA}
 
@@ -68,19 +70,24 @@
 \maketitle
 
 \begin{abstract}
-Include no author information in the initial submission, to facilitate
-blind review. The abstract should be one paragraph, indented 1/8 inch on
-both sides, in 9\textasciitilde point font with single spacing. The
-heading `Abstract' should be 10\textasciitilde point, bold, centered,
-with one line of space below it. This one-paragraph abstract section is
-required only for standard six page proceedings papers. Following the
-abstract should be a blank line, followed by the header `Keywords' and a
-list of descriptive keywords separated by semicolons, all in
-9\textasciitilde point font, as shown below.
+From infancy to adulthood, habituation and dishabituation enable
+learners to filter out repetitive information and remain attentive to
+novelty. Here, we leveraged large-scale datasets spanning infants,
+preschoolers, and adults to examine how individual differences in
+habituation parameters (e.g., decay rate, attention variability) predict
+dishabituation. We found that faster habituation consistently related to
+stronger attention recovery to novel stimuli. In addition, higher
+variability in looking behavior during repeated stimulus exposures
+predicted greater dishabituation in adults. We also observed that
+different measures of dishabituation yielded somewhat divergent
+patterns, highlighting the importance of robustness checks on
+exploratory analysis. These findings reveal how endogenous factors are
+meaningful drivers of looking behaviors. Overall, our results underscore
+the need for large-scale data approaches to studying visual attention
+across the lifespan.
 
 \textbf{Keywords:}
-Add your choice of indexing terms or keywords; kindly use a semi-colon;
-between each term.
+habituation; looking time; mega-analysis; individual differences
 \end{abstract}
 
 Habituation and dishabituation are fundamental processes in learning and
@@ -96,9 +103,8 @@ Dussutour, 2016; Dussutour, 2021; Ginsburg \& Jablonka, 2009) to humans
 out repetitive, non-informative stimuli while remaining sensitive to
 novel or meaningful changes. These mechanisms have become a cornerstone
 of research methods in cognitive development (Aslin, 2007; Cohen, 2004;
-Kucharskỳ, Zaharieva, Raijmakers, \& Visser, 2024; Oakes, 2010).
-
-A typical infant study utilizing the habituation paradigm involves
+Kucharskỳ, Zaharieva, Raijmakers, \& Visser, 2024; Oakes, 2010). A
+typical infant study utilizing the habituation paradigm involves
 repeatedly presenting an infant with the same stimulus until they
 exhibit a decline in interest, often measured by a progressive decrease
 in looking time. Once habituation is established (e.g., looking time in
@@ -108,69 +114,69 @@ novel. A dishabituation response---indicated by significantly longer
 looking time at the novel stimulus---suggests that the infant can
 discriminate between the two. Dishabituation magnitude serves as a
 crucial index of attentional recovery and sensitivity to novel stimuli.
-As a result, this method -- inducing habituation response and testing
-dishabituation -- has been extensively used to investigate infants'
-perceptual and cognitive development, providing valuable insights into
-early learning mechanisms.
+In this work, we used existing data collected using this method to study
+individual differences in dishabituation, and what individual-level
+predictors (e.g.~habituation rate and age) and experiment-level
+predictors (e.g.~stimulus complexity) account for those differences.
 
-How do individual differences in habituation and dishabituation reflect
-underlying cognitive mechanisms and developmental change? Extensive
-research has explored their variability and predictive value for later
-cognitive development. In general, findings suggest that the rate of
-habituation---how quickly an infant's attention declines in response to
-repeated exposure to a stimulus---is associated with foundational
-cognitive processes such as information processing speed (Hunter \&
-Ames, 1988; Poli et al., 2024). Infants who habituate more quickly tend
-to show higher IQ scores, better language acquisition, and stronger
-executive function abilities in later childhood (Colombo, Shaddy,
-Richman, Maikranz, \& Blaga, 2004; Kavšek, 2004; Slater, 1997).
-Similarly, individual differences in dishabituation---the extent to
-which an infant's attention recovers when presented with a novel
-stimulus---are often interpreted as indicators of memory strength.
-Greater dishabituation responses have been associated with stronger
-recognition memory (Fagan III, 1984; Fagan \& Singer, 1983). These
-results highlight the importance of individual variability in early
-attentional processes. Measures of habituation and dishabituation can
-serve as early cognitive markers with long-term implications.
+\hypertarget{endogenous-and-exogenous-factors-driving-looking-behavior}{%
+\subsubsection{Endogenous and exogenous factors driving looking
+behavior}\label{endogenous-and-exogenous-factors-driving-looking-behavior}}
 
-Prior work also underscores how factors such as age and stimulus
-complexity shape habituation and dishabituation (Colombo et al., 2004;
-Hunter \& Ames, 1988). According to the influential Hunter \& Ames
-(1988) model, the more an infant has been exposed to a stimulus, the
-less novel information remains to be processed, leading to a decline in
-attention. However, the more complex a stimulus is, the greater the
-amount of information available to be learned, leading to prolonged
-engagement. Additionally, older infants are assumed to process
-information more efficiently than younger infants, allowing them to
-habituate more quickly. This framework provides a valuable qualitative
-account of how developmental and stimulus-related factors interact to
-shape attentional dynamics. Nevertheless, its predictions remain largely
-qualitative rather than quantitative and have not been systematically
-tested (cf. Bergmann \& Cristia, 2016; Hunter, Ames, \& Koopman, 1983;
-Kosie et al., 2024).
+Understanding how endogenous and exogenous factors-- differences between
+individuals and differences between tasks-- interact to guide looking
+behavior is crucial for developing a comprehensive model of early
+learning. In one influential model of habituation (Hunter \& Ames,
+1988), learners, including infant learners, engage with stimuli to
+optimize learning. This leads to the predictions that (i) more efficient
+learners (e.g.~older infants) should habituate faster than less
+efficient learners (e.g.~younger infants), (ii) learners should recover
+attention to novel stimuli as they become more habituated with familiar
+stimuli, and (iii) learners should engage with a stimulus relative to
+its information value. All of these predictions have enjoyed empirical
+support (Cao, Raz, Saxe, \& Frank, 2023; Kidd, Piantadosi, \& Aslin,
+2012; Raz, Cao, Saxe, \& Frank, 2025). Particularly striking are studies
+of individual differences, suggesting that some differences could serve
+cognitive markers with long-term implications. Habituation rate---how
+quickly an infant's attention declines in response to repeated exposure
+to a stimulus---has been associated with foundational cognitive
+processes such as information processing speed (Hunter \& Ames, 1988;
+Poli et al., 2024). Infants who habituate more quickly tend to show
+higher IQ scores, better language acquisition, and stronger executive
+function abilities in later childhood (Colombo, Shaddy, Richman,
+Maikranz, \& Blaga, 2004; Kavšek, 2004; Slater, 1997). Similarly,
+individual differences in dishabituation---the extent to which an
+infant's attention recovers when presented with a novel stimulus---have
+been associated with stronger recognition memory (Fagan III, 1984; Fagan
+\& Singer, 1983).
 
-Understanding how individual differences in habituation and
-dishabituation interact with these factors is crucial for developing a
-comprehensive model of early learning. Individuals who habituate more
-quickly may process information more efficiently, allowing them to
-detect and respond to novel stimuli more effectively, resulting in
-greater dishabituation. Alternatively, faster habituation could reflect
-a general tendency to disengage from visual stimuli more rapidly,
-leading to weaker attentional recovery when a new stimulus appears.
-Another important factor that may influence dishabituation is
-volatility---the degree of variability in looking time across
-habituation trials. Behavioral variability has often been interpreted as
-random noise (Faisal, Selen, \& Wolpert, 2008; Renart \& Machens, 2014)
-or a lack of control (Todorov, 2004). However, variability can also be
-adaptive, reflecting sensitivity to environmental contingencies and
+Another striking example comes from studies manipulating environmental
+volatility, or the predictability of upcoming stimuli. Poli et al.
+(2024) demonstrated that infant learners adjust their looking behavior
+in response to volatility: they initiate saccades more quickly when
+stimuli are highly unpredictable. Yet, we know less about whether
+volatility varies as a function of the learners, as well as the learning
+context. On the one hand, behavioral variability has often been
+interpreted as random noise (Faisal, Selen, \& Wolpert, 2008; Renart \&
+Machens, 2014) or a lack of control (Todorov, 2004). In the context of
+habituation and dishabituation, these accounts would predict that
+greater behavioral volatility during habituation would be unrelated to
+subsequent dishabituation, or predict weaker dishabituation. On the
+other hand, behavioral volatility could also be adaptive, reflecting an
+enhanced sensitivity to potential environmental contingencies and more
 dynamic attention regulation (Aston-Jones \& Cohen, 2005; Wu, Miyamoto,
 Castro, Ölveczky, \& Smith, 2014). In the context of habituation and
 dishabituation, higher volatility in looking time may indicate greater
-flexibility in attention allocation, potentially enhancing
-dishabituation by allowing infants to remain more responsive to novel
+flexibility in attention allocation, potentially leading to greater
+dishabituation by allowing learners to remain more responsive to novel
 stimuli.
 
-Systematically studying these relationships---especially across
+\hypertarget{the-challenge-of-studying-drivers-of-looking-behavior}{%
+\subsubsection{The challenge of studying drivers of looking
+behavior}\label{the-challenge-of-studying-drivers-of-looking-behavior}}
+
+Systematically studying how different endogenous and exogenous factors
+shape looking time in the habituation paradigm---especially across
 different age groups and stimulus contexts---remains challenging.
 Recruiting and testing large infant samples can be highly
 resource-intensive (DeBolt, Rhemtulla, \& Oakes, 2020; Oakes, 2017),
@@ -187,25 +193,38 @@ Cristia, 2021), as well as online studies, which facilitate the
 recruitment of large and diverse participant samples (Chuey et al.,
 2021; Chuey, Boyce, Cao, \& Frank, 2024; Sheskin et al., 2020).
 
-In this study, we use large-scale datasets from online studies and
-mega-analysis to explore how individual differences in habituation rate
-predict dishabituation magnitude. Unlike previous work focused solely on
-infancy (Gilmore \& Thomas, 2002; Šimkovic \& Träuble, 2021; cf Cao,
-Raz, Saxe, \& Frank, 2023; Raz, Cao, Saxe, \& Frank, 2025), here we take
-a lifespan approach, examining habituation and dishabituation from
-infancy to adulthood. In addition, we also explored how dishabituation
-was shaped by factors like habituation volatility (e.g., fluctuations in
-looking time), age, and stimulus complexity shape dishabituation. By
-comparing across three age groups, we provide new insights into
-developmental continuity and discontinuity. To preview our findings, we
-found (1) Individuals who habituate faster show a stronger rebound in
-attention to novel stimuli; (2) In adults, but not younger participants,
-greater variability in looking time during habituation is associated
-with stronger dishabituation, and (3) Different operationalizations of
-dishabituation yield somewhat divergent results.
+Here, we use large-scale datasets from online studies and mega-analysis
+to explore how individual differences in habituation rate predict
+dishabituation magnitude. Unlike previous work focused solely on infancy
+(Gilmore \& Thomas, 2002; Šimkovic \& Träuble, 2021; cf Cao et al.,
+2023; Raz et al., 2025), here we take a lifespan approach, examining
+habituation and dishabituation from infancy to adulthood. In addition,
+we also explored how dishabituation was shaped by factors like
+habituation volatility (e.g., fluctuations in looking time), age, and
+stimulus complexity shape dishabituation. By comparing across three age
+groups, we provide new insights into developmental continuity and
+discontinuity. To preview our findings, we found (1) Individuals who
+habituate faster show a stronger rebound in attention to novel stimuli;
+(2) In adults, but not younger participants, greater variability in
+looking time during habituation is associated with stronger
+dishabituation, and (3) Different operationalizations of dishabituation
+yield somewhat divergent results.
 
 \hypertarget{methods}{%
 \section{Methods}\label{methods}}
+
+\captionsetup{belowskip=0pt,aboveskip=0pt}
+
+\begin{CodeChunk}
+\begin{figure*}[h]
+
+{\centering \includegraphics{figs/experimental_design-1} 
+
+}
+
+\caption[Experimental design of preschooler and infant experiments]{Experimental design of preschooler and infant experiments. There were four main differences: 1) Preschoolers responded with button presses, infants through lookaways, 2) preschoolers saw background trials after deviants, whereas deviants always appeared at the end in the infant experiments, 3) in the experiment with preschoolers, all trials were self-paced; whereas in infants, only the last trial was self-paced and 4) preschooler and infant paradigms used different sets of animate stimuli.}\label{fig:experimental_design}
+\end{figure*}
+\end{CodeChunk}
 
 \hypertarget{datatasets}{%
 \subsection{Datatasets}\label{datatasets}}
@@ -263,7 +282,7 @@ comparing test trials with perceptually novel stimuli to the last
 dishabituation trial. To ensure data quality, we excluded participants
 with fewer than three habituation trials. The final dataset includes
 1986 habituation-dishabituation sequences from 1986 participants (Age:
-\(M\) = 224.9 Days, \(SD\) = 96.45 Days; F; M; NA).
+\(M\) = 224.9 Days, \(SD\) = 96.45 Days; 1004 F; 955 M; 27 NA).
 
 \hypertarget{analytic-approach}{%
 \subsection{Analytic approach}\label{analytic-approach}}
@@ -389,6 +408,77 @@ dishabituation magnitude based on decay rate, age, and volatility (for
 all age groups), stimulus complexity (infants and adults), and initial
 looking time (in infants).
 
+\begin{table*}[t]
+    \centering
+    \caption{Comparison of Residual-Based Model and Difference of Log LT Model}
+    \vspace{0.2cm} % Adds slight space between caption and tables
+    \small % Reduce font size
+    \renewcommand{\arraystretch}{0.9} % Reduce row spacing
+    \setlength{\tabcolsep}{3pt} % Reduce column spacing
+
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \caption*{(A) Residual-Based Model}
+        \begin{tabular}{@{}lcccc@{}}
+            \toprule
+            Predictor & Coeff. & Std. Err. & t & $p$-value \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Adults}} \\
+            (Intercept) & 0 & 0.06 & 0.03 & .980 \\
+           Decay rate  & -0.46 & 0.08 & -6.09 & \textbf{$<$ .001} \\
+            Age & 0.09 & 0.07 & 1.36 & .180 \\
+            Volatility & 0.55 & 0.08 & 7.30 & \textbf{$<$ .001} \\
+            Complexity & 0.03 & 0.06 & 0.49 & .630 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Preschoolers}} \\
+            (Intercept) & 0 & 0.14 & 0 & 1.000 \\
+           Decay rate  & 0.49 & 0.17 & 2.91 & \textbf{.010} \\
+            Age & -0.06 & 0.15 & -0.42 & .680 \\
+            Volatility & 0.25 & 0.16 & 1.53 & .140 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Infants}} \\
+            (Intercept) & 0.08 & 0.03 & 2.63 & \textbf{.010} \\
+           Decay rate  & -0.17 & 0.02 & -8.31 & \textbf{$<$ .001} \\
+            Age & -0.09 & 0.02 & -4.26 & \textbf{$<$ .001} \\
+            Volatility & 0 & 0.03 & -0.14 & .890 \\
+            Complexity & -0.1 & 0.03 & -3.24 & \textbf{$<$ .001} \\
+            Initial LT & 0.45 & 0.03 & 16.6 & \textbf{$<$ .001} \\
+            \bottomrule
+        \end{tabular}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \caption*{(B) Robustness Check}
+        \begin{tabular}{@{}lcccc@{}}
+            \toprule
+            Predictor & Coeff. & Std. Err. & t & $p$-value \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Adults}} \\
+            (Intercept) & 0 & 0.07 & 0 & 1.000 \\
+           Decay rate  & 0.05 & 0.09 & 0.53 & .600 \\
+            Age & 0.03 & 0.07 & 0.34 & .740 \\
+            Volatility & 0.09 & 0.09 & 0.97 & .330 \\
+            Complexity & 0.15 & 0.07 & 2.08 & \textbf{.040} \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Preschoolers}} \\
+            (Intercept) & -0.04 & 0.17 & -0.25 & .810 \\
+           Decay rate  & 0.43 & 0.22 & 1.99 & .060 \\
+            Age & -0.19 & 0.18 & -1.04 & .310 \\
+            Volatility & 0.11 & 0.19 & 0.57 & .580 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Infants}} \\
+            (Intercept) & 0.13 & 0.04 & 3.59 & \textbf{$<$ .001} \\
+           Decay rate  & -0.15 & 0.02 & -6.62 & \textbf{$<$ .001} \\
+            Age & -0.08 & 0.02 & -3.56 & \textbf{$<$ .001} \\
+            Volatility & 0.04 & 0.03 & 1.27 & .200 \\
+            Complexity & -0.16 & 0.04 & -4.38 & \textbf{$<$ .001} \\
+            Initial LT & -0.06 & 0.03 & -2.00 & .050 \\
+            \bottomrule
+        \end{tabular}
+    \end{minipage}
+\end{table*}
+
 In this section, we begin by evaluating whether there is sufficient
 variability in decay rates to investigate individual differences. We
 then examine key predictors of dishabituation magnitude, followed by a
@@ -418,78 +508,91 @@ relationships between some of these variables in all three datasets: For
 example, volatility and decay rates were moderately positively
 correlated in adults and preschoolers (Adults: \emph{r} = 0.51;
 Preschoolers: \emph{r} = 0.44) and initial looking time and volatility
-were moderately positively correlated in in infants (0.65). Furthermore,
-our primary and secondary dependent measures were positively correlated
-for all three age groups (Adults: 0.63; Preschoolers: 0.62; Infants:
-0.53), suggesting both that they are converging measures, but also that
-they might be capturing different processes and noises. For all of the
-following statistical models, the variance inflation factors (VIFs) were
-below standard thresholds (Adults: \(VIF_{max}\) = 1.38; Preschoolers:
-\(VIF_{max}\) = 1.35; Infants: \(VIF_{max}\) = 1.91). This indicates
-that multicollinearity did not pose a major concern in our models.
+were moderately positively correlated in in infants (\emph{r} = 0.65).
+Furthermore, our primary and secondary dependent measures were
+positively correlated for all three age groups (Adults: 0.63;
+Preschoolers: 0.62; Infants: 0.53), suggesting both that they are
+converging measures, but also that they might be capturing different
+processes and noises. For all of the following statistical models, the
+variance inflation factors (VIFs) were below standard thresholds
+(Adults: \(VIF_{max}\) = 1.38; Preschoolers: \(VIF_{max}\) = 1.35;
+Infants: \(VIF_{max}\) = 1.91). This indicates that multicollinearity
+did not pose a major concern in our models.
 
 \hypertarget{what-predicts-dishabituation-in-individual-participants}{%
 \paragraph{What predicts dishabituation in individual
 participants?}\label{what-predicts-dishabituation-in-individual-participants}}
 
-Since the preschooler dataset includes significantly less data (N =
-XXX), we will mainly focus interpreting the results on the infants and
-adults dataset. First, we found that looking behavior during habituation
+Since the preschooler dataset includes significantly less data (N = 33),
+we will mainly focus interpreting the results on the infants and adults
+dataset. First, we found that looking behavior during habituation
 predicted dishabituation in both infants and adults. In both infants and
 adults datasets, individuals who habituated more quickly to repeated
-stimuli also looked longer when a new stimulus appeared (STATS; STATS).
-For infants, individuals who looked longer to the first habituated
-stimulus (a) also dishabituated more (STATS).
+stimuli also looked longer when a new stimulus appeared (Infants:
+\(\beta\) = -0.09, \emph{SE} = 0.02, \emph{p} \textless{} .001; Adults:
+\(\beta\) = 0.09, \emph{SE} = 0.07, \emph{p} \textless{} .001). In
+addition, we found that adults who showed higher volatility in their
+looking time also dishabituated stronger (\(\beta\) = 0.55, \emph{SE} =
+0.08, \emph{p} \textless{} .001). We did not see this relationship with
+younger participants (Preschoolers: \emph{p} = 0.14; Infants: \emph{p} =
+0.89). For infants, individuals who looked longer to the first
+habituated stimulus (\(a\)) also dishabituated more (\(\beta\) = 0.45,
+\emph{SE} = 0.03, \emph{p} \textless{} .001).
 
-We also found that higher volatility predicts greater dishabituation
-magnitude in adults, though there was no relationship in infants (STATS;
-STATS). However, the role of complexity and volatility differed: in
-adults, individuals who viewed complex (vs simple) stimuli throughout
-the study dishabituated more (STATS), while in infants, individuals who
-viewed simple stimuli (involving just inanimate objects) dishabituated
-more than those who viewed more complex stimuli (involving agents
-interacting with objects) (STATS). Last not but least, in infants,
-younger age was linked to greater dishabituation (STATS), but there was
-no significant relationship in neither adult nor the preschooler dataset
-(STATS; STATS). In the preschooler dataset, only decay rate was a
-significant predictor, suggesting that preschoolers who habituated
-slower showed a larger dishabituation magnitude (STATS). See Table 1 for
-a summary of the results.
+Second, we found that the effect of complexity predicted dishabituation
+in infants: individuals who viewed simple stimuli (involving just
+inanimate objects) dishabituated more than those who viewed more complex
+stimuli (involving agents interacting with objects) (\(\beta\) = -0.1,
+\emph{SE} = 0.03, \emph{p} \textless{} .001). Complexity did not predict
+dishabituation in adults and the preschooler dataset did not contain
+variability in stimulus complexity (Adults: \emph{p} = 0.63).
+
+Last but not least, participant age predicted dishabituation, but only
+in infants: While younger infants showed greater dishabituation
+(\(\beta\) = -0.09, \emph{SE} = 0.02, \emph{p} \textless{} .001), age
+did not predict dishabituation in neither adult nor the preschooler
+dataset (Adults: \emph{p} = 0.18; Preschoolers: \emph{p} = 0.68). See
+Table 1 for a summary of the results.
 
 \hypertarget{robustness-check.}{%
 \paragraph{Robustness check.}\label{robustness-check.}}
 
 Next, we repeated our analyses using our alternative measure of
 dishabituation (the difference between the dishabituation trial and the
-last habituation trial in log seconds). These two measures were
-moderately to strongly correlated in our three datasets (adults: STAT;
-preschoolers, STAT; infants: STATS). We repeated the same model
-selection procedure, dropping data from the last habituation trial to
-avoid spurious correlations between the habituation parameters and our
-dependent measure, and the same models had the lowest AICs across the
-two analyses.
+last habituation trial in log seconds).We repeated the same model
+selection procedure and analysis plan as above, except that for fitting
+the habituation and volatility parameters, we dropped data from the last
+habituation trial to avoid spurious correlations between these
+parameters and our dependent measure. The model selection procedure
+yielded the same results as the primary analysis: sufficient variability
+in b in all three datasets, and sufficient variability in a for infants.
 
 Despite this consistency of which model was selected as the best fitting
 model, the specific predictors differed slightly when using the
-log-transformed measure (See Table 1). In adults, only complexity
-remained a significant predictor of dishabituation magnitude (STATS). In
-preschoolers, decay rate was only marginally positively associated with
-dishabituation (STATS). (Given the small sample size, this result should
-be interpreted with caution.) For infants, the pattern largely mirrored
-our main analysis, with decay rate, age, and complexity all negatively
-associated with dishabituation magnitude (STATS). The initial looking
-time was negatively associated with the dishabituation magnitude
-(STATS), whereas in the residual-based method, the estimate was
-marginally positive (STATS).
+log-transformed measure (See Table 1). In adults, only complexity was a
+significant predictor of dishabituation magnitude (\(\beta\) = 0.15,
+\emph{SE} = 0.07, \emph{p} = 0.04). In preschoolers, decay rate was only
+marginally positively associated with dishabituation (\(\beta\) = 0.43,
+\emph{SE} = 0.22, \emph{p} = 0.06). (Given the small sample size, this
+result should be interpreted with caution.) For infants, the pattern
+largely mirrored our main analysis, with decay rate, age, and complexity
+all negatively associated with dishabituation magnitude (all \emph{p}s
+\textless{} 0.01). The initial looking time was negatively associated
+with the dishabituation magnitude (\(\beta\) = -0.06, \emph{SE} = 0.03,
+\emph{p} = 0.05), whereas in the residual-based method, the estimate was
+marginally positive.
 
-Overall, while key relationships between decay rate, age, and complexity
-showed some consistency across both measures, differences in the
-sensitivity of the decay rate effects and volatility effects indicate
-that these operationalizations of dishabituation magnitude do not always
-yield the same patterns of individual differences.
+Comparing the fit of the models across all three age groups, across the
+primary and secondary analyses, we found that the same predictors
+explained substantially more variance in the primary residual-based
+dishabituation measure (Adults: \(R^2_{adjusted}\) = 0.25; Preschoolers:
+\(R^2_{adjusted}\) = 0.33; Infants: \(R^2_{adjusted}\) = 0.28) than in
+the secondary difference score measure (Adults: \(R^2_{adjusted}\) =
+0.02; Preschoolers: \(R^2_{adjusted}\) = 0.11; Infants:
+\(R^2_{adjusted}\) = 0.04)
 
 From birth, humans explore and learn about the world through our looking
-behaviors, and two canonical behaviors we display are (1) habituation to
+behaviors, displaying two canonical behaviors: (1) habituation to
 repeated stimuli, and (2) recovery of attention to novel stimuli. How do
 these behaviors vary across individuals, and what predicts them?
 Studying these questions are challenging because of limitations on
@@ -501,20 +604,17 @@ dishabituation), demographics (age), and task factors (stimulus
 complexity). In particular, we studied the predictors of dishabituation,
 or orienting to novel stimuli. Overall, we found that individuals who
 habituate faster show a stronger rebound in attention to novel stimuli.
-We also observed an interesting relationship between the volatility of
-looking time and dishabituation magnitude, evident only in adults.Last
-but not least, our findings serve as a cautious note for researchers
-that different operationalizations of dishabituation can yield somewhat
-divergent results, underscoring the importance of considering how each
-metric may capture different underlying processes. Overall, this work
-supports longstanding claims that habituation and dishabituation are not
-merely passive responses governed primarily by the dynamics and features
-of sensory inputs, but also by the endogenous properties of the observer
+We also observed that adults who demonstrated more volatile looking
+during habituation dishabituated more strongly. This work supports
+longstanding claims that habituation and dishabituation are not merely
+passive responses governed primarily by the dynamics and features of
+sensory inputs, but also by the endogenous properties of the observer
 (Köster, Kayhan, Langeloh, \& Hoehl, 2020; Raz \& Saxe, 2020). Below, we
-discuss each of our positive findings and their implications for
-developmental research.
+discuss each of our positive primary findings and their implications for
+developmental research, and then discuss the discrepancies between the
+results from our primary and secondary analyses.
 
-Why do infants and adults who habituate more quickly to dishabituate
+Why do infants and adults who habituate more quickly also dishabituate
 more to novel stimuli? One possible explanation for this relationship is
 that individuals who habituate more quickly may process information more
 efficiently, allowing them to disengage from familiar stimuli and
@@ -537,74 +637,98 @@ are noisy measures of the same unifactorial construct, such as overall
 efficiency in processing and attention allocation. If so, this might
 explain why earlier studies have found overlapping correlations with
 cognitive outcomes---what appeared to be separate predictors could
-instead reflect different facets of the same mechanism.
+instead reflect different facets of the same mechanism. Measuring and
+studying a variety of partially related constructs in the same, large
+datasets, makes it possible for us to discover the latent, unifying
+processes that underlie what appear to be separate measures.
 
 Why do adults with more variable looking during habituation dishabituate
-more strongly than adults with more consistent looking? While prior work
-has investigated the relationship between environmental volatility
-(i.e.~the unpredictability of the stimuli) and looking behaviors on a
-group level, here we are finding that internal behavioral volatility
-also predicts looking behavior. In one prior study Poli et al showed
-that infants were faster to saccade to visual stimuli when the stream of
-stimuli they watched was unpredictable, than when it was predictable.
-Together these findings suggest that observers can adapt to
-environmental instability, and that observers meaningfully vary in how
+more strongly than adults with more consistent looking? Prior work has
+investigated the relationship between environmental volatility (i.e.~the
+unpredictability of the stimuli) and looking behaviors on a group level;
+for example, Poli et al showed that infants were faster to saccade to
+visual stimuli when the stream of stimuli they watched was
+unpredictable, than when it was predictable. Here, we found that
+internal behavioral volatility also predicts looking behavior. Together
+these findings suggest that observers can adapt to environmental
+instability, and that observers can also meaningfully vary in how
 unstable their looking behaviors are, even for repeated stimuli. In the
-current work, people whose attention fluctuates more, even when viewing
-the same stimulus repeatedly, are not necessarily inattentive or
-randomly shifting their gaze; rather, they may be more attuned to
-potential changes and better prepared to respond when those changes
-occur. This interpretation aligns with models of adaptive attention,
-where variability in gaze patterns reflects an active strategy to
-monitor the environment for new information (Aston-Jones \& Cohen, 2005;
-Wu et al., 2014). However, we only observed this relationship in adults.
-This might be due to younger participants exhibiting noisier looking
-behaviors, making it harder to detect systematic relationships between
-volatility and dishabituation.
+current work, adults whose attention fluctuates more during habituation,
+are not necessarily inattentive or randomly shifting their gaze; rather,
+they may be more attuned to potential changes and better prepared to
+respond when those changes occur. This interpretation aligns with models
+of adaptive attention, where variability in gaze patterns reflects an
+active strategy to monitor the environment for new information
+(Aston-Jones \& Cohen, 2005; Wu et al., 2014). However, we only observed
+this relationship in adults. This might be due to younger participants
+exhibiting (truly) noisier looking behaviors, making it harder to detect
+systematic relationships between volatility and dishabituation.
 
 Our current results and interpretations are constrained by several
 limitations. First, the heterogeneity of our data sources may weaken our
 developmental conclusions. While the adult and preschooler datasets
-share a comparable paradigm, the infant dataset integrates studies with
-diverse stimuli and procedures, introducing additional noise that
-complicates direct comparisons across ages. Relatedly, our analyses
-suggest that different measures of dishabituation may not always capture
-identical patterns across populations, highlighting the need for careful
-consideration when selecting operationalization. Given that most
-developmental studies rely on a single operationalization, our findings
-serve as a cautionary note that different operationalizations can shape
-observed effects and should be interpreted in the context of their
-underlying assumptions. Additionally, an important limitation is that we
-do not know whether we are capturing person-level individual
-differences, state-level individual differences, or a combination of
-both. Measures such as volatility, decay rate, and dishabituation
-magnitude may not be stable over time, given prior findings on the low
-test-retest reliability of habituation measures (Colombo, Mitchell,
-O'Brien, \& Horowitz, 1987; Cristia, Seidl, Singh, \& Houston, 2016;
-Hood et al., 1996). At the very least, participants who vary in behavior
-across a short span of time---whether due to intrinsic person-level
-traits, momentary state-level fluctuations, or an interaction between
-the two---demonstrate a stronger dishabituation effect. For future
-research, simulation work could provide a more systematic understanding
-of how different operationalizations influence observed effects,
-clarifying the extent to which methodological choices are sensitive to
-noise and error. By modeling different sources of noise---such as
-individual fluctuations in attention, measurement error, and trial-level
-variability---simulation studies could help determine whether observed
-effects are robust or driven by artifacts of the chosen
-operationalization.
+share a comparable paradigm, the preschooler dataset was very small, and
+the infant dataset integrates studies with diverse stimuli and
+procedures, introducing additional noise that complicates direct
+comparisons across datasets. For example, it is unclear whether the way
+we operationalized stimulus complexity truly captures the same contrast
+across adults, who watched stimuli of animate agents that were more vs
+less complex, and infants, who watched stimuli of including vs excluding
+animate agents.
+
+Discrepancies between our primary and secondary results highlight that
+individual differences in looking behavior depend on the measure of
+dishabituation used. In both the adult and preschooler datasets, no
+predictor was consistently robust, and neither group showed significant
+dishabituation across measures (ps \textgreater{} 0.05), contrasting
+with previous studies that found significant effects using a different
+operationalization of dishabituation (Cao et al., 2023; Raz et al.,
+2023). In contrast, infant results remained stable: infants generally
+dishabituated, with steeper habituation rates, simpler stimuli
+(inanimate objects), and younger age predicting greater novelty
+recovery. However, the relationship between initial looking time and
+dishabituation varied by method, with residual-based estimates being
+positive and log-transformed estimates negative. Given that many
+developmental studies choose just a single measure for their dependent
+variable, our findings serve as a cautionary note that different
+operationalizations can shape observed effects and researchers should
+consider robustness checks for exploratory analyses of developmental
+data.
+
+A last limitation is that while we found individual-level predictors of
+dishabituation, it is unknown whether these predictors reflect
+person-level individual differences, state-level individual differences,
+or a combination of both. Measures such as volatility, decay rate, and
+dishabituation magnitude may not be stable over time, and indeed display
+low test-retest reliability (Colombo, Mitchell, O'Brien, \& Horowitz,
+1987; Cristia, Seidl, Singh, \& Houston, 2016; Hood et al., 1996). The
+most conservative claim way to interpret our results is that
+participants who vary in behavior across a short span of time---whether
+due to intrinsic person-level traits, momentary state-level
+fluctuations, or an interaction between the two---demonstrate a stronger
+dishabituation effect. For future research, formal computational
+modeling could provide a more systematic understanding of how different
+operationalizations influence observed effects, clarifying the extent to
+which methodological choices are sensitive to noise and error. By
+modeling different sources of noise---such as individual fluctuations in
+attention, measurement error, and trial-level variability---this
+approach could help determine the conditions under which we should
+expect robust results vs those that are more sensitive to
+operationalization decisions, or state-level shifts in participant
+state.
 
 By analyzing large-scale datasets that span infancy to adulthood, we
-demonstrated that individual differences in habituation trajectories, as
-well as the chosen metrics of dishabituation, Although methodological
-heterogeneity and smaller sample sizes in preschoolers limit our ability
-to make direct developmental comparisons, this work provides a strong
-basis for future research to understand the developmental changes of
-visual attention. Moreover, our findings highlight that fluctuations in
-looking behavior should not be dismissed as noise; rather, they could
-reflect adaptive strategies that facilitate information gathering. Taken
-together, these insights underscore the need to view visual attention as
-an active process that contributes to learning across development.
+demonstrated that individual differences in habituation trajectories
+predict dishabituation magnitude. Although methodological heterogeneity
+and smaller sample sizes in preschoolers limit our ability to make
+direct developmental comparisons, this work provides a strong basis for
+future research to understand the developmental changes of visual
+attention. Moreover, our findings highlight that fluctuations in looking
+behavior should not be simply dismissed as noise; rather, they could
+also reflect adaptive strategies that facilitate information gathering.
+Taken together, these insights underscore the need to view visual
+attention as an active process that contributes to learning across
+development.
 
 \hypertarget{references}{%
 \section{References}\label{references}}
@@ -629,11 +753,6 @@ Aslin, R. N. (2007). What's in a look? \emph{Developmental Science},
 Aston-Jones, G., \& Cohen, J. D. (2005). An integrative theory of locus
 coeruleus-norepinephrine function: Adaptive gain and optimal
 performance. \emph{Annu. Rev. Neurosci.}, \emph{28}(1), 403--450.
-
-\leavevmode\vadjust pre{\hypertarget{ref-bergmann2016development}{}}%
-Bergmann, C., \& Cristia, A. (2016). Development of infants'
-segmentation of words from native speech: A meta-analytic approach.
-\emph{Developmental Science}, \emph{19}(6), 901--917.
 
 \leavevmode\vadjust pre{\hypertarget{ref-bergmann2018promoting}{}}%
 Bergmann, C., Tsuji, S., Piccinini, P. E., Lewis, M. L., Braginsky, M.,
@@ -743,11 +862,6 @@ Hunter, M. A., \& Ames, E. W. (1988). A multifactor model of infant
 preferences for novel and familiar stimuli. \emph{Advances in Infancy
 Research}.
 
-\leavevmode\vadjust pre{\hypertarget{ref-hunter1983development}{}}%
-Hunter, M. A., Ames, E. W., \& Koopman, R. (1983). Effects of stimulus
-complexity and familiarization time on infant preferences for novel and
-familiar stimuli. \emph{Developmental Psychology}, \emph{19}(3), 338.
-
 \leavevmode\vadjust pre{\hypertarget{ref-jeffrey1971habituation}{}}%
 Jeffrey, W. E., \& Cohen, L. B. (1971). Habituation in the human infant.
 \emph{Advances in Child Development and Behavior}, \emph{6}, 63--97.
@@ -762,17 +876,16 @@ Kavšek, M. (2004). Predicting later IQ from infant visual habituation
 and dishabituation: A meta-analysis. \emph{Journal of Applied
 Developmental Psychology}, \emph{25}(3), 369--393.
 
+\leavevmode\vadjust pre{\hypertarget{ref-kidd2012goldilocks}{}}%
+Kidd, C., Piantadosi, S. T., \& Aslin, R. N. (2012). The goldilocks
+effect: Human infants allocate attention to visual sequences that are
+neither too simple nor too complex. \emph{PloS One}, \emph{7}(5),
+e36399.
+
 \leavevmode\vadjust pre{\hypertarget{ref-koile2021toward}{}}%
 Koile, E., \& Cristia, A. (2021). Toward cumulative cognitive science: A
 comparison of meta-analysis, mega-analysis, and hybrid approaches.
 \emph{Open Mind}, \emph{5}, 154--173.
-
-\leavevmode\vadjust pre{\hypertarget{ref-kosie2024manybabies}{}}%
-Kosie, J. E., Zettersten, M., Abu-Zhaya, R., Amso, D., Babineau, M.,
-Baumgartner, H., et al.others. (2024). ManyBabies 5: A large-scale
-investigation of the proposed shift from familiarity preference to
-novelty preference in infant looking time pre-data collection manuscript
-for peer-review the ManyBabies 5 team.
 
 \leavevmode\vadjust pre{\hypertarget{ref-koster2020making}{}}%
 Köster, M., Kayhan, E., Langeloh, M., \& Hoehl, S. (2020). Making sense

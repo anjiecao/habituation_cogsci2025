@@ -14,7 +14,99 @@ vif_infant_max <- round(max(as.matrix(vif_infant), na.rm = TRUE), 2)
 resid_based_model_adult <- readRDS(here("cached_results/resid_based_model_adult.Rds"))
 resid_based_model_preschooler <- readRDS(here("cached_results/resid_based_model_preschooler.Rds"))
 resid_based_model_infant <- readRDS(here("cached_results/resid_based_model_infant.Rds"))
+
+logdiff_model_adult <- readRDS(here("cached_results/logdiff_model_adult.Rds"))
+logdiff_model_preschooler <- readRDS(here("cached_results/logdiff_model_preschooler.Rds"))
+logdiff_model_infant <- readRDS(here("cached_results/logdiff_model_infant.Rds"))
+
+adj_rsquared_adult_resid_based <- round(summary(readRDS(here("cached_results/resid_based_raw_model_adult.Rds")))$adj.r.squared, 2)
+adj_rsquared_preschooler_resid_based <- round(summary(readRDS(here("cached_results/resid_based_raw_model_preschooler.Rds")))$adj.r.squared, 2)
+adj_rsquared_infant_resid_based <- round(summary(readRDS(here("cached_results/resid_based_raw_model_infant.Rds")))$adj.r.squared, 2)
+
+adj_rsquared_adult_logdiff <- round(summary(readRDS(here("cached_results/logdiff_raw_model_adult.Rds")))$adj.r.squared, 2)
+adj_rsquared_preschooler_logdiff <- round(summary(readRDS(here("cached_results/logdiff_raw_model_preschooler.Rds")))$adj.r.squared, 2)
+adj_rsquared_infant_logdiff <- round(summary(readRDS(here("cached_results/logdiff_raw_model_infant.Rds")))$adj.r.squared, 2)
+
 ```
+
+
+
+\begin{table*}[t]
+    \centering
+    \caption{Comparison of Residual-Based Model and Difference of Log LT Model}
+    \vspace{0.2cm} % Adds slight space between caption and tables
+    \small % Reduce font size
+    \renewcommand{\arraystretch}{0.9} % Reduce row spacing
+    \setlength{\tabcolsep}{3pt} % Reduce column spacing
+
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \caption*{(A) Residual-Based Model}
+        \begin{tabular}{@{}lcccc@{}}
+            \toprule
+            Predictor & Coeff. & Std. Err. & t & $p$-value \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Adults}} \\
+            (Intercept) & 0 & 0.06 & 0.03 & .980 \\
+           Decay rate  & -0.46 & 0.08 & -6.09 & \textbf{$<$ .001} \\
+            Age & 0.09 & 0.07 & 1.36 & .180 \\
+            Volatility & 0.55 & 0.08 & 7.30 & \textbf{$<$ .001} \\
+            Complexity & 0.03 & 0.06 & 0.49 & .630 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Preschoolers}} \\
+            (Intercept) & 0 & 0.14 & 0 & 1.000 \\
+           Decay rate  & 0.49 & 0.17 & 2.91 & \textbf{.010} \\
+            Age & -0.06 & 0.15 & -0.42 & .680 \\
+            Volatility & 0.25 & 0.16 & 1.53 & .140 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Infants}} \\
+            (Intercept) & 0.08 & 0.03 & 2.63 & \textbf{.010} \\
+           Decay rate  & -0.17 & 0.02 & -8.31 & \textbf{$<$ .001} \\
+            Age & -0.09 & 0.02 & -4.26 & \textbf{$<$ .001} \\
+            Volatility & 0 & 0.03 & -0.14 & .890 \\
+            Complexity & -0.1 & 0.03 & -3.24 & \textbf{$<$ .001} \\
+            Initial LT & 0.45 & 0.03 & 16.6 & \textbf{$<$ .001} \\
+            \bottomrule
+        \end{tabular}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \caption*{(B) Robustness Check}
+        \begin{tabular}{@{}lcccc@{}}
+            \toprule
+            Predictor & Coeff. & Std. Err. & t & $p$-value \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Adults}} \\
+            (Intercept) & 0 & 0.07 & 0 & 1.000 \\
+           Decay rate  & 0.05 & 0.09 & 0.53 & .600 \\
+            Age & 0.03 & 0.07 & 0.34 & .740 \\
+            Volatility & 0.09 & 0.09 & 0.97 & .330 \\
+            Complexity & 0.15 & 0.07 & 2.08 & \textbf{.040} \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Preschoolers}} \\
+            (Intercept) & -0.04 & 0.17 & -0.25 & .810 \\
+           Decay rate  & 0.43 & 0.22 & 1.99 & .060 \\
+            Age & -0.19 & 0.18 & -1.04 & .310 \\
+            Volatility & 0.11 & 0.19 & 0.57 & .580 \\
+            \midrule
+            \multicolumn{5}{c}{\textbf{Infants}} \\
+            (Intercept) & 0.13 & 0.04 & 3.59 & \textbf{$<$ .001} \\
+           Decay rate  & -0.15 & 0.02 & -6.62 & \textbf{$<$ .001} \\
+            Age & -0.08 & 0.02 & -3.56 & \textbf{$<$ .001} \\
+            Volatility & 0.04 & 0.03 & 1.27 & .200 \\
+            Complexity & -0.16 & 0.04 & -4.38 & \textbf{$<$ .001} \\
+            Initial LT & -0.06 & 0.03 & -2.00 & .050 \\
+            \bottomrule
+        \end{tabular}
+    \end{minipage}
+\end{table*}
+
+
+
+
+
+
 
 
 In this section, we begin by evaluating whether there is sufficient variability in decay rates to investigate individual differences. We then examine key predictors of dishabituation magnitude, followed by a robustness check on our operationalization of this measure.
@@ -31,15 +123,17 @@ Before studying the effects of our predictors on dishabituation, we measured the
 
 #### What predicts dishabituation in individual participants?
 
-Since the preschooler dataset includes significantly less data (N = `r nrow(preschooler_hab_full %>% distinct(subject))`), we will mainly focus interpreting the results on the infants and adults dataset. First, we found that looking behavior during habituation predicted dishabituation in both infants and adults. In both infants and adults datasets, individuals who habituated more quickly to repeated stimuli also looked longer when a new stimulus appeared (Infants: $\beta$ = `r filter(resid_based_model_infant, term == "age")$estimate`, *SE* = `r filter(resid_based_model_infant, term == "age")$std.error`, *p* < .001; Adults: $\beta$ = `r filter(resid_based_model_adult, term == "age")$estimate`, *SE* = `r filter(resid_based_model_adult, term == "age")$std.error`, *p* < .001). For infants, individuals who looked longer to the first habituated stimulus ($a$) also dishabituated more (STATS). 
+Since the preschooler dataset includes significantly less data (N = `r nrow(preschooler_hab_full %>% distinct(subject))`), we will mainly focus interpreting the results on the infants and adults dataset. First, we found that looking behavior during habituation predicted dishabituation in both infants and adults. In both infants and adults datasets, individuals who habituated more quickly to repeated stimuli also looked longer when a new stimulus appeared (Infants: $\beta$ = `r filter(resid_based_model_infant, term == "age")$estimate`, *SE* = `r filter(resid_based_model_infant, term == "age")$std.error`, *p* < .001; Adults: $\beta$ = `r filter(resid_based_model_adult, term == "age")$estimate`, *SE* = `r filter(resid_based_model_adult, term == "age")$std.error`, *p* < .001). In addition, we found that adults who showed higher volatility in their looking time also dishabituated stronger ($\beta$ = `r filter(resid_based_model_adult, term == "sd_resid")$estimate`, *SE* = `r filter(resid_based_model_adult, term == "sd_resid")$std.error`, *p* < .001). We did not see this relationship with younger participants (Preschoolers: *p* = `r filter(resid_based_model_preschooler, term == "sd_resid")$p.value`; Infants: *p* = `r filter(resid_based_model_infant, term == "sd_resid")$p.value`). For infants, individuals who looked longer to the first habituated stimulus ($a$) also dishabituated more ($\beta$ = `r filter(resid_based_model_infant, term == "intercept")$estimate`, *SE* = `r filter(resid_based_model_infant, term == "intercept")$std.error`, *p* < .001).
 
-We also found that higher volatility predicts greater dishabituation magnitude in adults, though there was no relationship in infants (STATS; STATS). However, the role of complexity and volatility differed: in adults, individuals who viewed complex (vs simple) stimuli throughout the study dishabituated more (STATS), while in infants, individuals who viewed simple stimuli (involving just inanimate objects) dishabituated more than those who viewed more complex stimuli (involving agents interacting with objects) (STATS). Last not but least, in infants, younger age was linked to greater dishabituation (STATS), but there was no significant relationship in neither adult nor the preschooler dataset (STATS; STATS).  In the preschooler dataset, only decay rate was a significant predictor, suggesting that preschoolers who habituated slower showed a larger dishabituation magnitude (STATS). See Table 1 for a summary of the results. 
+Second, we found that the effect of complexity predicted dishabituation in infants: individuals who viewed simple stimuli (involving just inanimate objects) dishabituated more than those who viewed more complex stimuli (involving agents interacting with objects) ($\beta$ = `r filter(resid_based_model_infant, term == "complexity1")$estimate`, *SE* = `r filter(resid_based_model_infant, term == "complexity1")$std.error`, *p* < .001). Complexity did not predict dishabituation in adults and the preschooler dataset did not contain variability in stimulus complexity (Adults: *p* = `r filter(resid_based_model_adult, term == "complexity1")$p.value`).
+
+Last but not least, participant age predicted dishabituation, but only in infants: While younger infants showed greater dishabituation ($\beta$ = `r filter(resid_based_model_infant, term == "age")$estimate`, *SE* = `r filter(resid_based_model_infant, term == "age")$std.error`, *p* < .001), age did not predict dishabituation in neither adult nor the preschooler dataset (Adults: *p* = `r filter(resid_based_model_adult, term == "age")$p.value`; Preschoolers:  *p* = `r filter(resid_based_model_preschooler, term == "age")$p.value`). See Table 1 for a summary of the results. 
 
 
 #### Robustness check.
 
-Next, we repeated our analyses using our alternative measure of dishabituation (the difference between the dishabituation trial and the last habituation trial in log seconds). These two measures were moderately to strongly correlated in our three datasets (adults: STAT; preschoolers, STAT; infants: STATS). We repeated the same model selection procedure, dropping data from the last habituation trial to avoid spurious correlations between the habituation parameters and our dependent measure, and the same models had the lowest AICs across the two analyses.
+Next, we repeated our analyses using our alternative measure of dishabituation (the difference between the dishabituation trial and the last habituation trial in log seconds).We repeated the same model selection procedure and analysis plan as above, except that for fitting the habituation and volatility parameters, we dropped data from the last habituation trial to avoid spurious correlations between these parameters and our dependent measure. The model selection procedure yielded the same results as the primary analysis: sufficient variability in b in all three datasets, and sufficient variability in a for infants.
 
-Despite this consistency of which model was selected as the best fitting model, the specific predictors differed slightly when using the log-transformed measure (See Table 1). In adults, only complexity remained a significant predictor of dishabituation magnitude (STATS). In preschoolers, decay rate was only marginally positively associated with dishabituation (STATS). (Given the small sample size, this result should be interpreted with caution.) For infants, the pattern largely mirrored our main analysis, with decay rate, age, and complexity all negatively associated with dishabituation magnitude (STATS). The initial looking time was negatively associated with the dishabituation magnitude (STATS), whereas in the residual-based method, the estimate was marginally positive (STATS). 
+Despite this consistency of which model was selected as the best fitting model, the specific predictors differed slightly when using the log-transformed measure (See Table 1). In adults, only complexity was a significant predictor of dishabituation magnitude ($\beta$ = `r filter(logdiff_model_adult, term == "complexity1")$estimate`, *SE* = `r filter(logdiff_model_adult, term == "complexity1")$std.error`, *p* = `r filter(logdiff_model_adult, term == "complexity1")$p.value`). In preschoolers, decay rate was only marginally positively associated with dishabituation ($\beta$ = `r filter(logdiff_model_preschooler, term == "decay_rate")$estimate`, *SE* = `r filter(logdiff_model_preschooler, term == "decay_rate")$std.error`, *p* = `r filter(logdiff_model_preschooler, term == "decay_rate")$p.value`). (Given the small sample size, this result should be interpreted with caution.) For infants, the pattern largely mirrored our main analysis, with decay rate, age, and complexity all negatively associated with dishabituation magnitude (all *p*s < 0.01). The initial looking time was negatively associated with the dishabituation magnitude ($\beta$ = `r filter(logdiff_model_infant, term == "intercept")$estimate`, *SE* = `r filter(logdiff_model_infant, term == "intercept")$std.error`, *p* = `r filter(logdiff_model_infant, term == "intercept")$p.value`), whereas in the residual-based method, the estimate was marginally positive. 
 
-Overall, while key relationships between decay rate, age, and complexity showed some consistency across both measures, differences in the sensitivity of the decay rate effects and volatility effects indicate that these operationalizations of dishabituation magnitude do not always yield the same patterns of individual differences.
+Comparing the fit of the models across all three age groups, across the primary and secondary analyses, we found that the same predictors explained substantially more variance in the primary residual-based dishabituation measure (Adults: $R^2_{adjusted}$ = `r adj_rsquared_adult_resid_based`; Preschoolers: $R^2_{adjusted}$ = `r adj_rsquared_preschooler_resid_based`; Infants: $R^2_{adjusted}$ = `r adj_rsquared_infant_resid_based`) than in the secondary difference score measure (Adults: $R^2_{adjusted}$ = `r adj_rsquared_adult_logdiff`; Preschoolers: $R^2_{adjusted}$ = `r adj_rsquared_preschooler_logdiff`; Infants: $R^2_{adjusted}$ = `r adj_rsquared_infant_logdiff`)

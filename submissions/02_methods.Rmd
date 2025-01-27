@@ -13,10 +13,20 @@ demog_adult_age <- demog_adult %>% summarise(mean = mean(age, na.rm = TRUE), sd 
 demog_adult_sex <- demog_adult %>% group_by(Sex) %>% count() 
 demog_preschooler_age <- demog_preschooler %>% summarise(mean = mean(age_in_months, na.rm = TRUE), sd = sd(age_in_months, na.rm = TRUE)) %>% mutate_if(is.numeric, round, 2)
 demog_infants_age <- demog_infants %>% summarise(mean = mean(agedays, na.rm = TRUE), sd = sd(agedays, na.rm = TRUE)) %>%  mutate_if(is.numeric, round, 2)
-demog_infant_sex <- demog_infants %>% group_by(sex) 
+demog_infant_sex <- demog_infants %>% group_by(sex) %>% count()
 
 
 ```
+
+
+
+\captionsetup{belowskip=0pt,aboveskip=0pt}
+
+```{r experimental_design, echo = FALSE, fig.env = "figure*", fig.pos = "h", fig.align='center', fig.width=7, fig.height=3.5, set.cap.width=T, num.cols.cap=2, fig.cap = "Experimental design of preschooler and infant experiments. There were four main differences: 1) Preschoolers responded with button presses, infants through lookaways, 2) preschoolers saw background trials after deviants, whereas deviants always appeared at the end in the infant experiments, 3) in the experiment with preschoolers, all trials were self-paced; whereas in infants, only the last trial was self-paced and 4) preschooler and infant paradigms used different sets of animate stimuli."}
+img <- png::readPNG(here("plots/full_data.png"))
+grid::grid.raster(img)
+```
+
 
 ## Datatasets
 

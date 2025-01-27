@@ -635,6 +635,15 @@ preschooler_res
 infant_res
 
 
+adult_model <- lm(resid_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_adult_scaled)
+preschooler_model <- lm(resid_diff ~ decay_rate + age  + sd_resid , data = all_measures_preschooler_scaled)
+infant_model <-  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept , data = all_measures_infant_scaled)
+
+adult_model %>%  saveRDS(here("cached_results/resid_based_raw_model_adult.Rds"))
+preschooler_model %>% saveRDS(here("cached_results/resid_based_raw_model_preschooler.Rds"))
+infant_model %>%  saveRDS(here("cached_results/resid_based_raw_model_infant.Rds"))
+
+
 adult_res
 preschooler_res
 infant_res
@@ -701,6 +710,16 @@ infant_res_check <- broom::tidy(
 adult_res_check
 preschooler_res_check
 infant_res_check
+
+
+adult_logdiff_model <-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_adult_check_scaled)
+preschooler_logdiff_model <-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data = all_measures_preschooler_check_scaled)
+infant_logdiff_model <-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_infant_check_scaled)
+
+adult_logdiff_model %>%  saveRDS(here("cached_results/logdiff_raw_model_adult.Rds"))
+preschooler_logdiff_model %>% saveRDS(here("cached_results/logdiff_raw_model_preschooler.Rds"))
+infant_logdiff_model %>%  saveRDS(here("cached_results/logdiff_raw_model_infant.Rds"))
+
 
 adult_res_check %>% saveRDS(here("cached_results/logdiff_model_adult.Rds"))
 # only complexity positive
@@ -1205,51 +1224,14 @@ ggsave("plots/pic_model_estimates_combined.png", pic_model_estimates_combined, w
 # TABLES 
 
 ```{r}
-adult_res <- broom::tidy(
-  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_full[[1]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "adults")
+adult_res <- readRDS(here("cached_results/resid_based_model_adult.Rds"))
+preschooler_res <- readRDS(here("cached_results/resid_based_model_preschooler.Rds"))
+infant_res <- readRDS(here("cached_results/resid_based_model_infant.Rds"))
 
-preschooler_res <- broom::tidy(
-  lm(resid_diff ~ decay_rate + age  + sd_resid, data = all_measures_full[[2]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "preschooler")
+adult_res_check <- readRDS(here("cached_results/logdiff_model_adult.Rds"))
+preschooler_res_check <- readRDS(here("cached_results/logdiff_model_preschooler.Rds"))
+infant_res_check <- readRDS(here("cached_results/logdiff_model_infant.Rds"))
 
-infant_res <- broom::tidy(
-  lm(resid_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_full[[3]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "infant")
-
-
-adult_res_check <- broom::tidy(
-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity, data = all_measures_no_last[[1]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "adults")
-
-preschooler_res_check <- broom::tidy(
-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid, data = all_measures_no_last[[2]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "preschooler")
-
-infant_res_check <- broom::tidy(
-  lm(log_hab_dev_diff ~ decay_rate + age  + sd_resid + complexity + intercept, data = all_measures_no_last[[3]])
-) %>% 
-   mutate_if(is.numeric, round, 2) %>% 
-  mutate(group= "infant")
-
-
-adult_res
-preschooler_res
-infant_res
-
-adult_res_check # only complexity positive
-preschooler_res_check # only decay rate MARGINALLY positive
-infant_res_check # decya rate negative, age negative, complexity negative, intercept (starting point) negative
 
 ```
 ## best fitting models in single tables
@@ -1366,6 +1348,7 @@ cat(combined_infant_table)
 ```
 
 ## one giant table
+
 ```{r}
 adult_res <- adult_res %>% mutate(model = "Resisual-Based")
 preschooler_res <- preschooler_res %>% mutate(model = "Resisual-Based")
@@ -1433,5 +1416,9 @@ for (group in unique(formatted_data$`Age Group`)) {
 }
 
 cat(latex_table)
+```
+
+```{r}
+all_combined_data
 ```
 

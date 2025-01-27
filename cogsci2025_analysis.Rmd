@@ -634,6 +634,11 @@ adult_res
 preschooler_res
 infant_res
 
+
+adult_res
+preschooler_res
+infant_res
+
 # decay rate negative, complexity positive, sd_resid positive
 adult_res %>% saveRDS(here("cached_results/resid_based_model_adult.Rds"))
 # only decay rate positive               
@@ -928,6 +933,9 @@ measure_cor_preschoolers <- all_measures_no_last[[2]] %>%
 measure_cor_infants <- all_measures_no_last[[3]] %>% 
   select(subject, log_hab_dev_diff) %>% 
   left_join(all_measures_full[[3]] %>% select(subject, resid_diff))
+
+
+
 
 ```
 

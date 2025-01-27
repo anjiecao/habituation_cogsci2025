@@ -288,19 +288,27 @@ is the decay rate, reflecting the speed of habituation (See FIGURE 1 for
 schematic illustration of how a and b shapes the habituation
 trajectory).
 
+First, we used a data-driven approach to ask, for each age group, which
+parameters explain variability in habituation across individuals (and
+thus, which parameters are worth studying as predictors of
+dishabituation).We selected the model with the lowest Akaike Information
+Criterion (AIC), with a \(\Delta_{AIC} > 4\) suggesting substantial
+support for the model with lower AIC (Burnham \& Anderson, 2004), among
+the models with the following random effects:
+
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \item
-  Random effects on a only -- allows individual variation in initial
+  Random effects on \(a\) only -- allows individual variation in initial
   looking time but assumes a shared decay rate across participants.
 \item
-  Random effects on b only -- allows individual variation in decay rate
-  while assuming a common initial looking time across participants.
+  Random effects on \(b\) only -- allows individual variation in decay
+  rate while assuming a common initial looking time across participants.
 \item
-  Random effects on both a and b -- allows individual variation in both
-  parameters (Note: In the model, we explicitly assumed a and b are
-  uncorrelated because they are conceptually independent. Moreover, this
-  constraint improves statistical parsimony by reducing model
+  Random effects on both \(a\) and \(b\) -- allows individual variation
+  in both parameters (Note: In the model, we explicitly assumed a and b
+  are uncorrelated because they are conceptually independent. Moreover,
+  this constraint improves statistical parsimony by reducing model
   complexity.)
 \end{enumerate}
 
@@ -390,27 +398,35 @@ robustness check on our operationalization of this measure.
 \paragraph{Exponential decay model
 selection.}\label{exponential-decay-model-selection.}}
 
-We found sufficient variability in a and b in the infant dataset, and
-sufficient variability in b in the adult and preschooler dataset. We
-then used these best-fitting models to extract individual decay rates
-(b; all age groups) and initial looking time (a; infants only) for each
-age group.
+We found sufficient variability in \(a\) and \(b\) in the infant
+dataset, and sufficient variability in \(b\) in the adult and
+preschooler dataset. We then used these best-fitting models to extract
+individual decay rates (\(b\); all age groups) and initial looking time
+(\(a\); infants only) for each age group.
 
 \hypertarget{collinearity-between-potential-predictors-of-dishabituation}{%
 \paragraph{Collinearity between potential predictors of
 dishabituation}\label{collinearity-between-potential-predictors-of-dishabituation}}
 
 Before studying the effects of our predictors on dishabituation, we
-measured their relationships to each other. Since some of these
-predictors are conceptually related (i.e.~decay rate, volatility, and
-age), we examined their correlations to assess potential collinearity
-within each dataset (Figure XX). Most correlations were weak, except
-that volatility and decay rates showed moderate correlations in adults
-and preschoolers (STATS) and strong correlation between initial looking
-time and volatility (STATS). However, variance inflation factors (VIFs)
-were below standard thresholds for the models in the following section
-(STATS; STATS; STATS). This indicates that multicollinearity did not
-pose a major concern in our models.
+measured their first-order correlations to each other and to the
+dependent measures. Since some of these predictors are conceptually
+related (i.e.~decay rate, volatility, and age), we examined their
+correlations to assess potential collinearity within each dataset (See
+Supplementary Information: Figure XX). We found small to moderate
+relationships between some of these variables in all three datasets: For
+example, volatility and decay rates were moderately positively
+correlated in adults and preschoolers (Adults: \emph{r} = 0.51;
+Preschoolers: \emph{r} = 0.44) and initial looking time and volatility
+were moderately positively correlated in in infants (0.65). Furthermore,
+our primary and secondary dependent measures were positively correlated
+for all three age groups (Adults: 0.63; Preschoolers: 0.62; Infants:
+0.53), suggesting both that they are converging measures, but also that
+they might be capturing different processes and noises. For all of the
+following statistical models, the variance inflation factors (VIFs) were
+below standard thresholds (Adults: \(VIF_{max}\) = 1.38; Preschoolers:
+\(VIF_{max}\) = 1.35; Infants: \(VIF_{max}\) = 1.91). This indicates
+that multicollinearity did not pose a major concern in our models.
 
 \hypertarget{what-predicts-dishabituation-in-individual-participants}{%
 \paragraph{What predicts dishabituation in individual
@@ -630,6 +646,11 @@ acquisition research. \emph{Child Development}, \emph{89}(6),
 Boisseau, R. P., Vogel, D., \& Dussutour, A. (2016). Habituation in
 non-neural organisms: Evidence from slime moulds. \emph{Proceedings of
 the Royal Society B: Biological Sciences}, \emph{283}(1829), 20160446.
+
+\leavevmode\vadjust pre{\hypertarget{ref-burnham2004multimodel}{}}%
+Burnham, K. P., \& Anderson, D. R. (2004). Multimodel inference:
+Understanding AIC and BIC in model selection. \emph{Sociological Methods
+\& Research}, \emph{33}(2), 261--304.
 
 \leavevmode\vadjust pre{\hypertarget{ref-cao2023habituation}{}}%
 Cao, A., Raz, G., Saxe, R., \& Frank, M. C. (2023). Habituation reflects

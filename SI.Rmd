@@ -1,0 +1,132 @@
+---
+title: "Individual differences in habituation rate and behavioral volatility predict dishabituation in adults, preschoolers and infants"
+author: "Anonymous CogSci submission"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    toc: true
+  html_document: default
+subtitle: "Supplementary Information" 
+
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo=FALSE, message = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(corrplot)
+library(kableExtra)
+
+cormatrix_adult <- readRDS(here('cached_results/cormatrix_adult.Rds'))
+cormatrix_preschooler <- readRDS(here('cached_results/cormatrix_preschooler.Rds'))
+cormatrix_infant <- readRDS(here('cached_results/cormatrix_infant.Rds'))
+
+pmatrix_adult <- readRDS(here("cached_results/pmatrix_adult.Rds"))
+pmatrix_preschooler <- readRDS(here("cached_results/pmatrix_preschooler.Rds"))
+pmatrix_infant <- readRDS(here("cached_results/pmatrix_infant.Rds"))
+
+model_comp_resid_based_adult <- readRDS(here("cached_results/model_comp_resid_based_adult.Rds"))
+model_comp_resid_based_preschooler <- readRDS(here("cached_results/model_comp_resid_based_preschooler.Rds"))
+model_comp_resid_based_infant <- readRDS(here("cached_results/model_comp_resid_based_infant.Rds"))
+
+model_comp_logdiff_adult <- readRDS(here("cached_results/model_comp_logdiff_adult.Rds"))
+model_comp_logdiff_preschooler <- readRDS(here("cached_results/model_comp_logdiff_preschooler.Rds"))
+model_comp_logdiff_infant <- readRDS(here("cached_results/model_comp_logdiff_infant.Rds"))
+```
+
+
+# Model comparisons 
+
+## Residual-based models 
+
+```{r fi}
+model_comp_logdiff_adult %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Adults") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+```{r}
+model_comp_logdiff_preschooler %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Preschoolers") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+```{r}
+model_comp_logdiff_infant %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Infants") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+## Robustness check models
+
+```{r}
+model_comp_logdiff_adult %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Adults") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+```{r}
+model_comp_logdiff_preschooler %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Preschoolers") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+
+```
+
+
+```{r}
+model_comp_logdiff_infant %>% select(-group) %>% 
+  kable("latex", booktabs = TRUE, align = "c", 
+        caption = "Infants") %>%
+  kable_styling(full_width = TRUE, position = "left") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+# Correlations between measures and predictors 
+
+Below are the correlation matrices for all predictors and the two operationalizations of dishabituation. Specifically, `resid_diff` represents the residual-based dishabituation, and `log_diff` is the difference score between the log-transformed looking time at the dishabituation trial and the last habituation trial. The numbers in the matrices are Pearson’s correlation coefficients, and blank cells indicate nonsignificant correlations.
+
+
+
+```{r fig.cap="Correlational matrix for adults."}
+corrplot(cormatrix_adult, 
+         p.mat = pmatrix_adult, 
+         method = "number",sig.level = 0.05, insig = "blank", title = "Adults", 
+         mar = c(0, 0, 1, 0)) 
+```
+
+
+```{r fig.cap="Correlational matrix for preschoolers. "}
+corrplot(cormatrix_preschooler, 
+         p.mat = pmatrix_preschooler, 
+         method = "number",sig.level = 0.05, insig = "blank", title = "Preschoolers", 
+         mar = c(0, 0, 1, 0)) 
+```
+
+
+
+```{r fig.cap="Correlational matrix for infants."}
+corrplot(cormatrix_infant, 
+         p.mat = pmatrix_infant, 
+         method = "number",sig.level = 0.05, insig = "blank", title = "Infants", 
+         mar = c(0, 0, 1, 0)) 
+```
+
+

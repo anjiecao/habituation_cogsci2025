@@ -100,6 +100,7 @@ adj_rsquared_infant_logdiff <- round(summary(readRDS(here("cached_results/logdif
             \bottomrule
         \end{tabular}
     \end{minipage}
+    \caption{\label{demo-table}This table presents model estimates predicting dishabituation magnitude across age groups. All numeric predictors were z-scored within age groups for comparability. The categorical predictor, complexity, was contrast-coded using sum coding. Bold values indicate statistically significant results.}
 \end{table*}
 
 

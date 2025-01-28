@@ -133,7 +133,7 @@ infant_model_b_only <- fit_nlme_b_only(infant_hab_no_last, infant_start_vals)
 # 2. Model comparisons 
 
 ```{r}
-model_names <- c("full", "a only", "b only")
+model_names <- c("a + b", "a only", "b only")
 
 adult_comparisons <- compare_models(list(adult_model_full, adult_model_a_only, adult_model_b_only), 
                model_names) %>% mutate(group = "adults")
@@ -145,9 +145,10 @@ infant_comparisons <- compare_models(list(infant_model_full, infant_model_a_only
                model_names)%>% mutate(group = "infants")
 
 
-adult_comparisons
-preschooler_comparisons
-infant_comparisons
+adult_comparisons %>% saveRDS(here("cached_results/model_comp_logdiff_adult.Rds"))
+preschooler_comparisons %>%  saveRDS(here("cached_results/model_comp_logdiff_preschooler.Rds"))
+infant_comparisons %>% 
+saveRDS(here("cached_results/model_comp_logdiff_infant.Rds"))
 ```
 
 # 3. Get winning model and look into what we want 
@@ -269,7 +270,7 @@ infant_model_full <- fit_nlme_full(infant_hab_full, infant_start_vals)
 infant_model_a_only <- fit_nlme_a_only(infant_hab_full, infant_start_vals)
 infant_model_b_only <- fit_nlme_b_only(infant_hab_full, infant_start_vals)
 
-model_names <- c("full", "a only", "b only")
+model_names <- c("a + b", "a only", "b only")
 
 adult_comparisons <- compare_models(list(adult_model_full, adult_model_a_only, adult_model_b_only), 
                model_names) %>% mutate(group = "adults")
@@ -281,9 +282,10 @@ infant_comparisons <- compare_models(list(infant_model_full, infant_model_a_only
                model_names)%>% mutate(group = "infants")
 
 
-adult_comparisons
-preschooler_comparisons
-infant_comparisons
+adult_comparisons %>% saveRDS(here("cached_results/model_comp_resid_based_adult.Rds"))
+preschooler_comparisons %>% saveRDS(here("cached_results/model_comp_resid_based_preschooler.Rds"))
+infant_comparisons %>% 
+  saveRDS(here("cached_results/model_comp_resid_based_infant.Rds"))
 ```
 
 ## 4.2 get residuals and the thing we want 
@@ -813,44 +815,52 @@ library(corrplot)
 
 adult_cor_df <- all_measures_full[[1]] %>% 
   left_join(all_measures_no_last[[1]] %>% select(subject,log_hab_dev_diff)) %>% 
-  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) 
+  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) %>% 
+  rename(volatility = sd_resid, 
+         log_diff = log_hab_dev_diff)
 
 adult_cor_df <- na.omit(adult_cor_df)
 adult_correlation_matrix <- cor(adult_cor_df, use = "complete.obs")
-p_value_matrix <- rcorr(as.matrix(adult_cor_df))$P
-p_value_matrix[is.na(p_value_matrix)] <- 1
+adult_p_val_matrix <- rcorr(as.matrix(adult_cor_df))$P
+adult_p_val_matrix[is.na(adult_p_val_matrix)] <- 1
 
 
 corrplot(adult_correlation_matrix, 
-         p.mat = p_value_matrix, 
+         p.mat = adult_p_val_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "adult") 
 
 preschooler_cor_df <- all_measures_full[[2]] %>% 
   left_join(all_measures_no_last[[2]] %>% select(subject,log_hab_dev_diff)) %>% 
-  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) 
+  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff) %>% 
+  rename(volatility = sd_resid, 
+         log_diff = log_hab_dev_diff)
 
 preschooler_cor_df <- na.omit(preschooler_cor_df)
 preschooler_correlation_matrix <- cor(preschooler_cor_df, use = "complete.obs")
-p_value_matrix <- rcorr(as.matrix(preschooler_cor_df))$P
-p_value_matrix[is.na(p_value_matrix)] <- 1
+preschooler_p_value_matrix <- rcorr(as.matrix(preschooler_cor_df))$P
+preschooler_p_value_matrix[is.na(preschooler_p_value_matrix)] <- 1
 
 
 corrplot(preschooler_correlation_matrix, 
-         p.mat = p_value_matrix, 
+         p.mat = preschooler_p_value_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "preschooler") 
 
 infant_cor_df <- all_measures_full[[3]] %>% 
   left_join(all_measures_no_last[[3]] %>% select(subject,log_hab_dev_diff)) %>% 
-  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff, intercept) 
+  select(decay_rate, resid_diff, sd_resid, age, log_hab_dev_diff, intercept) %>% 
+  rename(volatility = sd_resid, 
+         log_diff = log_hab_dev_diff, 
+         init_lt = intercept)
+
 
 infant_cor_df <- na.omit(infant_cor_df)
 infant_correlation_matrix <- cor(infant_cor_df, use = "complete.obs")
-p_value_matrix <- rcorr(as.matrix(infant_cor_df))$P
-p_value_matrix[is.na(p_value_matrix)] <- 1
+infant_p_value_matrix <- rcorr(as.matrix(infant_cor_df))$P
+infant_p_value_matrix[is.na(infant_p_value_matrix)] <- 1
 
 
 corrplot(infant_correlation_matrix, 
-         p.mat = p_value_matrix, 
+         p.mat = infant_p_value_matrix, 
          method = "number",sig.level = 0.05, insig = "blank", title = "infant") 
 
 
@@ -858,6 +868,10 @@ corrplot(infant_correlation_matrix,
 saveRDS(adult_correlation_matrix, here('cached_results/cormatrix_adult.Rds'))
 saveRDS(preschooler_correlation_matrix, here('cached_results/cormatrix_preschooler.Rds'))
 saveRDS(infant_correlation_matrix, here('cached_results/cormatrix_infant.Rds'))
+
+saveRDS(adult_p_val_matrix, here("cached_results/pmatrix_adult.Rds"))
+saveRDS(preschooler_p_value_matrix, here("cached_results/pmatrix_preschooler.Rds"))
+saveRDS(infant_p_value_matrix, here("cached_results/pmatrix_infant.Rds"))
 
 ```
 

@@ -992,18 +992,101 @@ bind_rows(
 
 ```
 
+# Simulation plots 
+
+```{r}
+# Define a function for the exponential decay
+decay_model <- function(trial_number, a, b) {
+  a * exp(b * trial_number)
+}
+
+# Create a data frame with different combinations of a and b
+trial_data <- expand.grid(
+  trial_number = seq(0, 6, by = .1),
+  a = c(10, 20, 30),  # Different initial values
+  b = c(-0.8, -0.4, 0.1)  # Different decay rates
+)
+
+# Calculate the looking time based on the decay model
+trial_data <- trial_data %>%
+  mutate(trial_looking_time = decay_model(trial_number, a, b)) %>% 
+  mutate(trial_number = trial_number + 1)
+
+# Plot the curves
+ggplot(trial_data, aes(x = trial_number, y = trial_looking_time, color = factor(a), linetype = factor(b))) +
+  geom_line(size = 1) +
+  scale_x_continuous(breaks = seq(1, 6, 1))+
+  scale_y_continuous(breaks = seq(0, 50, 10))+
+   scale_colour_grey(start = 0.2, end = 0.8)+
+  labs(
+    x = "Trial Number",
+    y = "Trial Looking Time",
+    color = "Initial Looking Time",
+    linetype = "Decay Rate"
+  ) +
+  ggthemes::theme_few()
+```
+
+
 
 # Raw data plots 
+
+
+```{r fig.width=5, fig.height=9}
+all_hab <- bind_rows(
+  adult_hab_full %>% mutate(group = "Adults") %>% mutate(trial_looking_time = trial_looking_time/1000),
+  preschooler_hab_full %>%  mutate(group = "Preschoolers") %>% mutate(trial_looking_time = trial_looking_time/1000), 
+  infant_hab_full %>% mutate(group = "Infants")
+) %>% 
+  mutate(group = factor(group, c("Adults", "Preschoolers", "Infants"))) %>% 
+  ggplot(aes(x = trial_number, y = trial_looking_time, group = trial_number)) + 
+  geom_point(alpha = .1, size = 0.5) + 
+  geom_line(aes(group = subject), alpha = .08) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", color = "lightsalmon2") +
+  stat_summary(fun = mean, geom = "line", color = "lightsalmon2", group = 1) + 
+  labs(x = "Trial Number", y = "Trial Looking Time (s)") +
+  theme_classic() + 
+  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank() )
+
+```
+
+
+```{r fig.width=2.5, fig.height=9}
+
+all_dishab <- bind_rows(
+  adult_dishab %>% mutate(group = "Adults") %>% mutate(trial_looking_time = trial_looking_time/1000),
+  preschooler_dishab %>%  mutate(group = "Preschoolers") %>% mutate(trial_looking_time = trial_looking_time/1000), 
+  infant_dishab %>% mutate(group = "Infants") %>% mutate(trial_looking_time = trial_looking_time/1000),
+) %>% 
+  mutate(group = factor(group, c("Adults", "Preschoolers", "Infants"))) %>% 
+  ggplot(aes(x = factor(1), y = trial_looking_time)) + 
+  theme_classic() +
+  geom_point(alpha = .08, position = position_jitter(width = .1))+
+  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+
+  labs(x = "", y = "") +
+  theme_classic() +
+  theme(axis.text.x = element_text(color = "white")) + 
+  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank() )
+
+```
+
+```{r fig.height=8, fig.width=8}
+cowplot::plot_grid(
+  all_hab, all_dishab, rel_widths = c(2.5, 1)
+)
+```
+
+
 
 ```{r}
 pic_adult_hab <- adult_hab_full %>% 
   #filter(subject %in% sample(unique(adult_hab_full$subject), 3)) %>% 
   ggplot(aes(x = trial_number, y = trial_looking_time/1000, group = trial_number)) + 
-  geom_point(alpha = .1, size = 0.5, color = "lightsalmon2") + 
-  geom_line(aes(group = subject), alpha = .08, color = "lightsalmon2") +
-  stat_summary(fun = mean, geom = "point", size = 0.5, color = "royalblue3") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "royalblue3", width = 0.08) +
-  stat_summary(fun = mean, geom = "line", size = 0.3, color = "royalblue3", group = 1) + 
+  geom_point(alpha = .1, size = 0.5) + 
+  geom_line(aes(group = subject), alpha = .08) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", color = "lightsalmon2") +
+  stat_summary(fun = mean, geom = "line", color = "lightsalmon2", group = 1) + 
   labs(x = "Trial Number", y = "Trial Looking Time (s)", title = "Adults: Habituation") +
   ylim(0,40) +
   theme_classic()
@@ -1013,6 +1096,8 @@ pic_adult_dishab <- adult_dishab %>%
   ggplot(aes(x = factor(1), y = trial_looking_time/1000)) + 
   theme_classic() +
   geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+    geom_point(alpha = .08, position = position_jitter(width = .1))+
+
   ylim(0, 40) +
   labs(x = "", y = "Trial Looking Time (s)", title = "Dishabituation") +
   theme_classic() +

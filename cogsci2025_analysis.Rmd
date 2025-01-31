@@ -1046,7 +1046,9 @@ all_hab <- bind_rows(
   stat_summary(fun = mean, geom = "line", color = "lightsalmon2", group = 1) + 
   labs(x = "Trial Number", y = "Trial Looking Time (s)") +
   theme_classic() + 
-  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank() )
+  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank(), axis.text=element_text(size=12), 
+                                                         strip.text.x = element_text(size = 12), 
+                                                         axis.title=element_text(size=14,face="bold"))
 
 ```
 
@@ -1062,12 +1064,14 @@ all_dishab <- bind_rows(
   ggplot(aes(x = factor(1), y = trial_looking_time)) + 
   theme_classic() +
   geom_point(alpha = .08, position = position_jitter(width = .1))+
-  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5) +
+  geom_boxplot(width = 0.5, color = "maroon3", outlier.alpha = 0.5, alpha = .4) +
 
   labs(x = "", y = "") +
   theme_classic() +
   theme(axis.text.x = element_text(color = "white")) + 
-  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank() )
+  facet_wrap(~group, scales = "free", nrow = 3) + theme( strip.background = element_blank(),axis.text=element_text(size=12),
+                                                         strip.text.x = element_text(size = 12), 
+                                                         axis.title=element_text(size=14,face="bold"))
 
 ```
 

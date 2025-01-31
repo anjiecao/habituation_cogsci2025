@@ -11,7 +11,7 @@ subtitle: "Supplementary Information"
 ---
 
 ```{r include = FALSE}
-knitr::opts_chunk$set(echo=FALSE, message = FALSE)
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
 ```
 
 
@@ -20,6 +20,7 @@ library(tidyverse)
 library(here)
 library(corrplot)
 library(kableExtra)
+library(ggthemes)
 
 cormatrix_adult <- readRDS(here('cached_results/cormatrix_adult.Rds'))
 cormatrix_preschooler <- readRDS(here('cached_results/cormatrix_preschooler.Rds'))
@@ -37,6 +38,151 @@ model_comp_logdiff_adult <- readRDS(here("cached_results/model_comp_logdiff_adul
 model_comp_logdiff_preschooler <- readRDS(here("cached_results/model_comp_logdiff_preschooler.Rds"))
 model_comp_logdiff_infant <- readRDS(here("cached_results/model_comp_logdiff_infant.Rds"))
 ```
+
+
+
+# Simulations 
+
+## Generating dataset 
+
+```{r }
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+set.seed(42)
+
+#### 1. Generate Simulated Data ####
+N <- 200                # Number of participants
+n_hab <- 5              # Number of habituation trials
+true_a <- 1.5           # Population intercept for habituation
+true_b <- -0.3          # Population slope for habituation
+sigma_baseline <- 0.5   # SD of random intercepts
+sigma_slope <- 0.2      # SD of random slopes
+sigma_obs <- 0.2        # Observation noise
+alpha_dishab <- 3.0     # Dishabituation intercept
+true_dishab <- 2.0      # "True" dishabituation effect
+sigma_dishab <- 0.3     # Noise on dishabituation
+
+# Generate per-participant random effects
+a_i <- rnorm(N, 0, sigma_baseline)  # Random intercepts
+b_i <- rnorm(N, 0, sigma_slope)     # Random slopes
+
+# Create empty dataframe
+sim_data <- data.frame(
+  id = rep(1:N, each = n_hab + 1),
+  trial = rep(1:(n_hab + 1), times = N),
+  t_ij = NA_real_,
+  baseline = rep(a_i, each = n_hab + 1)
+)
+
+# Generate habituation trials
+for(i in 1:N){
+  for(j in 1:n_hab){
+    row_index <- (i-1)*(n_hab+1) + j
+    sim_data$t_ij[row_index] <- exp(
+      (true_a + a_i[i]) + (true_b + b_i[i])*j
+    ) + rnorm(1, 0, sigma_obs)
+  }
+}
+
+# Generate dishabituation trial (novel stimulus)
+for(i in 1:N){
+  row_index <- (i-1)*(n_hab+1) + (n_hab+1)
+  sim_data$t_ij[row_index] <- 
+    (alpha_dishab + a_i[i] + true_dishab) + rnorm(1, 0, sigma_dishab)
+}
+```
+
+
+Here we simulated a dataset to model habituation and dishabituation effects in a looking time paradigm. Each of the 200 participants undergoes five habituation trials followed by one dishabituation trial. The habituation process is modeled using an exponential decay function, where looking time decreases across trials according to a population-level intercept and slope, with individual variability introduced through random intercepts and slopes. Observation noise is added to simulate natural variability in responses. The dishabituation trial, representing a response to a novel stimulus, is generated using a separate intercept with an additional dishabituation effect and individual-level noise. This setup captures both the within-subject decline in looking time during habituation and the rebound effect when a novel stimulus is introduced.
+
+```{r fig.pos="t!", fig.width = 4, fig.height = 4}
+sim_data %>% 
+  ggplot(aes(x = trial, y = t_ij)) + 
+  geom_point(position = position_jitter(width = .2), alpha = .2) + 
+  stat_summary(fun.data = "mean_cl_boot", color = "red") + 
+  theme_few()
+```
+
+```{r}
+# Extract last habituation trial and dishabituation trial
+classical_measures <- sim_data %>%
+  filter(trial %in% c(n_hab, n_hab + 1)) %>%
+  pivot_wider(
+    id_cols = id,
+    names_from = trial,
+    values_from = t_ij,
+    names_prefix = "trial_"
+  ) %>%
+  mutate(
+    raw_dishabituation = trial_6,   # Raw looking time on dishabituation trial
+    classical_val = log(trial_6) - log(trial_5)  # Log difference score
+  ) %>%
+  left_join(
+    sim_data %>%
+      distinct(id, .keep_all = TRUE) %>%
+      select(id, baseline),
+    by = "id"
+  )
+
+# Residual-Based Measure
+# Fit an intercept-only model for dishabituation
+dishab_data <- sim_data %>% filter(trial == n_hab + 1)
+lm_dishab <- lm(t_ij ~ 1, data = dishab_data)
+dishab_data$resid_dishab <- resid(lm_dishab)
+
+#### 2. Compute Classical and Residual-Based Measures ####
+
+# Fit a linear model for habituation
+hab_data <- sim_data %>% filter(trial <= n_hab)
+lm_hab <- lm(t_ij ~ trial, data = hab_data)
+
+# Get residuals for the last habituation trial only
+resid_last_hab <- hab_data %>%
+  mutate(resid_hab = resid(lm_hab)) %>%
+  filter(trial == n_hab) %>%
+  select(id, resid_hab)
+
+# Compute residual-based measure
+residual_measures <- dishab_data %>%
+  left_join(resid_last_hab, by = "id") %>%
+  mutate(V_i = resid_dishab - resid_hab) %>%
+  select(id, V_i)
+
+# Merge all measures
+final_data <- classical_measures %>%
+  left_join(residual_measures, by = "id")
+
+cor_raw_dishab <- cor(final_data$raw_dishabituation, final_data$baseline, use = "complete.obs")
+cor_residual_based <- cor(final_data$V_i, final_data$baseline, use = "complete.obs")
+```
+
+## Comparison with baseline 
+
+Comparison of raw dishabituation and residual-based measures against baseline looking time. The left panel displays the relationship between raw dishabituation looking time (i.e., looking time on the first post-habituation trial) and baseline looking time (*r* = `r round(cor_raw_dishab, 2)`), while the right panel shows the relationship between the residual-based measure ($V_i$; *r* = `r round(cor_residual_based, 2)`), which accounts for individual differences in habituation trends, and baseline looking time. Both measures exhibit variability in their associations with baseline looking, highlighting the impact of measurement choice on capturing dishabituation effects. Shaded areas represent 95% confidence intervals from linear model fits.
+
+The plot shows that residual-based approach significantly reduced the correlation between dishabituation and the baseline looking time. 
+
+```{r fig.pos="h!", fig.width = 8, fig.height = 4}
+final_data %>% 
+  pivot_longer(cols = c("raw_dishabituation", "V_i"), 
+               names_to = "type", values_to = "value") %>% 
+  mutate(
+    type_clean = if_else(type == "raw_dishabituation", "Raw Dishabituation", "Residual-based Measure")
+  )%>% 
+  ggplot(aes(x = baseline, y = value)) + 
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~type_clean, scales = "free") + 
+  theme_few() + 
+  ylab("")
+
+
+```
+
+
+
 
 
 # Model comparisons 
@@ -105,7 +251,7 @@ Below are the correlation matrices for all predictors and the two operationaliza
 
 
 
-```{r fig.cap="Correlational matrix for adults."}
+```{r fig.pos="H!", fig.width = 3.5, fig.height = 3.5, fig.cap="Correlational matrix for adults."}
 corrplot(cormatrix_adult, 
          p.mat = pmatrix_adult, 
          method = "number",sig.level = 0.05, insig = "blank", title = "Adults", 
@@ -113,7 +259,7 @@ corrplot(cormatrix_adult,
 ```
 
 
-```{r fig.cap="Correlational matrix for preschoolers. "}
+```{r fig.pos="H!", fig.width = 3.5, fig.height = 3.5, fig.cap="Correlational matrix for preschoolers. "}
 corrplot(cormatrix_preschooler, 
          p.mat = pmatrix_preschooler, 
          method = "number",sig.level = 0.05, insig = "blank", title = "Preschoolers", 
@@ -122,11 +268,18 @@ corrplot(cormatrix_preschooler,
 
 
 
-```{r fig.cap="Correlational matrix for infants."}
+```{r fig.pos="H!", fig.width = 3.5, fig.height = 3.5, fig.cap="Correlational matrix for infants."}
 corrplot(cormatrix_infant, 
          p.mat = pmatrix_infant, 
          method = "number",sig.level = 0.05, insig = "blank", title = "Infants", 
          mar = c(0, 0, 1, 0)) 
 ```
+
+
+
+
+
+
+
 
 
